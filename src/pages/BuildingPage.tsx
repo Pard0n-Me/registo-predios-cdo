@@ -1,0 +1,186 @@
+import { useEffect, useState } from 'react'
+import { getBuildingFull, unitLabel } from '../data/store'
+import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
+import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel, statusLabel } from '../ui'
+
+function chips(b: Building): [string, string][] {
+  const t = (v: string, yes: string, no: string, q: string): [string, string] =>
+    v === 'sim' ? [yes, 'ok'] : v === 'nao' ? [no, ''] : [q, 'q']
+  const out: [string, string][] = [
+    b.construction === '?' ? ['Construção ?', 'q'] : [{ betao: 'Betão / placa', tabique: 'Tabique', misto: 'Misto' }[b.construction], 'acc'],
+    t(b.elevator, 'Elevador', 'Sem elevador', 'Elevador ?'),
+    t(b.garage, 'Garagens', 'Sem garagens', 'Garagens ?'),
+    t(b.storage, 'Arrecadações' + (b.storage_note ? ` (${b.storage_note})` : ''), 'Sem arrecadações', 'Arrecadações ?'),
+    b.ground_commerce === 'sim' ? [`RC: ${b.commerce_desc || 'comércio'}`, 'acc'] : b.ground_commerce === 'nao' ? ['RC: habitação', ''] : ['Comércio RC ?', 'q'],
+    t(b.porter, 'Porteira residente', 'Sem porteira', 'Porteira ?'),
+    b.mailbox === '?' ? ['Caixas ?', 'q'] : [`Caixas no ${b.mailbox}`, ''],
+    t(b.horizontal_property, 'PH', 'Sem PH (prédio inteiro)', 'PH ?'),
+    b.cond_ext === '?' ? ['Exterior ?', 'q'] : [`Exterior: ${condLabel(b.cond_ext).toLowerCase()}`, b.cond_ext === 'bom' ? 'ok' : b.cond_ext === 'mau' ? 'bad' : 'warn'],
+    b.cond_int === '?' ? ['Interior ?', 'q'] : [`Interior: ${condLabel(b.cond_int).toLowerCase()}`, b.cond_int === 'bom' ? 'ok' : b.cond_int === 'mau' ? 'bad' : 'warn'],
+    b.orientation === '?' ? ['Orientação ?', 'q'] : [b.orientation, ''],
+  ]
+  return out
+}
+
+type Ev = { kind: 'visit'; at: string; v: Visit } | { kind: 'listing'; at: string; l: Listing }
+
+export default function BuildingPage({ id }: { id: string }) {
+  const [f, setF] = useState<BuildingFull | null>(null)
+  const [err, setErr] = useState('')
+  const [open, setOpen] = useState<Ev | null>(null)
+  useEffect(() => { getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }, [id])
+  if (err) return <main><div className="err">{err}</div></main>
+  if (!f) return <main><div className="sub" style={{ padding: 20 }}>A carregar…</div></main>
+  const b = f.building
+
+  // último resultado por fração (visitas já vêm da mais recente para a mais antiga)
+  const last = new Map<string, VisitResult>()
+  for (const v of f.visits) for (const r of f.results.filter(r => r.visit_id === v.id)) if (!last.has(r.unit_id)) last.set(r.unit_id, r)
+  const unitBy = new Map(f.units.map(u => [u.label, u]))
+  const nUnits = b.floors.reduce((a, x) => a + x.doors.length, 0)
+  const gridLabels = new Set(b.floors.flatMap(x => x.doors.map(d => unitLabel(x.label, d))))
+  const extraUnits = f.units.filter(u => !gridLabels.has(u.label))
+
+  const cellText = (u: Unit | undefined) => {
+    if (!u) return '—'
+    if (u.commercial_status !== 'nada') return statusLabel(u.commercial_status)
+    const r = last.get(u.id)
+    if (!r) return u.typology ?? '—'
+    const p = f.personUnits.find(pu => pu.unit_id === u.id)
+    const person = p && f.people.find(x => x.id === p.person_id)
+    return r.outcomes.includes('falei') && person ? person.name : r.outcomes.map(outcomeLabel).join(' + ')
+  }
+
+  const events: Ev[] = [
+    ...f.visits.map(v => ({ kind: 'visit' as const, at: v.visited_at, v })),
+    ...f.listings.map(l => ({ kind: 'listing' as const, at: l.first_seen, l })),
+  ].sort((a, c) => c.at.localeCompare(a.at))
+
+  return (
+    <>
+      <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Mapa</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button></header>
+      <main>
+        <div className="card">
+          <div className="sub">{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>
+          <div className="chips" style={{ marginTop: 10 }}>{chips(b).map(([t, c]) => <span key={t} className={'chip ' + c}>{t}</span>)}</div>
+          {(b.condo_admin || b.notes) && <div className="note">{b.condo_admin ? `Administração: ${b.condo_admin}\n` : ''}{b.notes ?? ''}</div>}
+        </div>
+
+        <div className="card">
+          <h2>Frações · último resultado</h2>
+          {!b.floors.length && <div className="sub">Grelha por definir. <a href={`#/p/${id}/editar`}>Definir pisos e frações</a></div>}
+          <div className="grid">
+            {b.floors.map(fl => (
+              <div className="floor" key={fl.label}>
+                <div className="floor-label">{fl.label}</div>
+                <div className="units" style={{ gridTemplateColumns: `repeat(${fl.doors.length},1fr)` }}>
+                  {fl.doors.map(d => {
+                    const u = unitBy.get(unitLabel(fl.label, d))
+                    return <button key={d} className={'unit ' + cellClass(u?.commercial_status, u && last.get(u.id))} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
+                      <b>{d || fl.label}</b><span>{cellText(u)}</span></button>
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          {!!extraUnits.length && <div className="chips" style={{ marginTop: 10 }}>{extraUnits.map(u => <button key={u.id} className="chip" onClick={() => go(`/p/${id}/f/${u.id}`)}>{u.label}</button>)}</div>}
+          <div className="legend" style={{ marginTop: 10 }}>
+            <span><i className="dot" style={{ background: 'var(--ok)' }} />Falei</span>
+            <span><i className="dot" style={{ background: 'var(--accent)' }} />Carta / postal</span>
+            <span><i className="dot" style={{ background: 'var(--warn)' }} />Caixa cheia</span>
+            <span><i className="dot" style={{ background: 'var(--bad)' }} />À venda</span>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2>Histórico</h2>
+          {!events.length && <div className="sub">Ainda nada.</div>}
+          {events.map(e => (
+            <div className="ev" key={(e.kind === 'visit' ? e.v.id : e.l.id)} onClick={() => setOpen(e)}>
+              <div className="d">{e.kind === 'visit' ? fmtDate(e.v.visited_at, e.v.year_uncertain) : fmtDate(e.l.first_seen, e.l.first_seen_uncertain)}</div>
+              <div>{e.kind === 'visit' ? visitLine(e.v, f) : listingLine(e.l, f)}</div>
+              <div className="sub">›</div>
+            </div>
+          ))}
+        </div>
+      </main>
+      <div className="fab">
+        <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
+        <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
+      </div>
+      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} />}
+    </>
+  )
+}
+
+function visitLine(v: Visit, f: BuildingFull) {
+  const rs = f.results.filter(r => r.visit_id === v.id)
+  const talks = rs.filter(r => r.outcomes.includes('falei')).length
+  const who = v.companion ? `com ${v.companion}` : v.origin === 'legado' ? '' : 'sozinho'
+  return <>{[v.origin === 'legado' ? 'Legado' : 'Visita', who, rs.length ? `${rs.length} ${rs.length === 1 ? 'porta' : 'portas'}` : '', talks ? `${talks} ${talks === 1 ? 'conversa' : 'conversas'}` : ''].filter(Boolean).join(' · ')}
+    {v.general_note && <div className="sub">{v.general_note}</div>}</>
+}
+function listingLine(l: Listing, f: BuildingFull) {
+  const u = f.units.find(x => x.id === l.unit_id)
+  const p = f.prices.filter(x => x.listing_id === l.id).sort((a, b) => b.at.localeCompare(a.at))[0]
+  const who = l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser || (l.advertiser_type === '?' ? 'anunciante ?' : l.advertiser_type)
+  return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · retirado</span>}</>
+}
+
+function Detail({ ev, f, onClose }: { ev: Ev; f: BuildingFull; onClose: () => void }) {
+  const bid = f.building.id
+  let body
+  if (ev.kind === 'visit') {
+    const v = ev.v
+    const rs = f.results.filter(r => r.visit_id === v.id)
+      .map(r => ({ r, u: f.units.find(u => u.id === r.unit_id) }))
+      .sort((a, b) => f.units.indexOf(a.u!) - f.units.indexOf(b.u!))
+    const notes = f.unitNotes.filter(n => n.visit_id === v.id)
+    body = <>
+      <b>{v.origin === 'legado' ? 'Visita (legado)' : 'Visita'} · {v.year_uncertain ? fmtDate(v.visited_at, true) + ' (ano a confirmar)' : fmtDateTime(v.visited_at)}</b>
+      <div className="sub">{f.building.street}, {f.building.number}{v.companion ? ` · com ${v.companion}` : v.origin === 'legado' ? '' : ' · sozinho'}</div>
+      {v.general_note && <div className="note">{v.general_note}</div>}
+      {v.raw_text && <div className="note">Texto original: {v.raw_text}</div>}
+      {rs.map(({ r, u }) => {
+        const ints = f.interactions.filter(i => i.visit_id === v.id && i.unit_id === r.unit_id)
+        return <div key={r.id} className="row" style={{ display: 'block' }}>
+          <a href={`#/p/${bid}/f/${r.unit_id}`}><b>{u?.label}</b></a> <span className="sub">· {r.outcomes.map(outcomeLabel).join(' + ')}</span>
+          {r.note && <div className="sub">{r.note}</div>}
+          {ints.map(i => {
+            const p = f.people.find(x => x.id === i.person_id)
+            const role = f.personUnits.find(pu => pu.person_id === i.person_id && pu.unit_id === r.unit_id)?.role
+            return <div key={i.id} style={{ marginTop: 6 }}>
+              {p && <a className="chip ok" href={`#/pessoa/${p.id}`} style={{ textDecoration: 'none' }}>👤 {p.name}{role ? ` · ${roleLabel(role)}` : ''} ›</a>}
+              {i.notes && <div className="sub" style={{ marginTop: 4 }}>{i.notes}</div>}
+            </div>
+          })}
+        </div>
+      })}
+      {!!notes.length && <><h2 style={{ marginTop: 14 }}>Disseram sobre outras frações</h2>
+        {notes.map(n => <div key={n.id} className="row" style={{ display: 'block' }}><a href={`#/p/${bid}/f/${n.unit_id}`}>{f.units.find(u => u.id === n.unit_id)?.label}</a> <span className="sub">· {n.source ?? '?'}</span><div>{n.text}</div></div>)}</>}
+    </>
+  } else {
+    const l = ev.l
+    const prices = f.prices.filter(p => p.listing_id === l.id).sort((a, b) => b.at.localeCompare(a.at))
+    const rows: [string, string][] = [
+      ['Fração', f.units.find(u => u.id === l.unit_id)?.label ?? l.floor_hint ?? '?'],
+      ['Operação', l.operation === 'venda' ? 'Venda' : 'Arrendamento'],
+      ['Tipologia · área', `${l.typology ?? '?'} · ${l.area_m2 ? l.area_m2 + ' m²' : '?'}`],
+      ['Anunciante', l.advertiser_type === 'particular' ? 'Particular (FSBO)' : `${l.advertiser ?? '?'}${l.advertiser_type !== '?' ? ` (${l.advertiser_type})` : ''}`],
+      ['Exclusividade', l.exclusivity ?? '?'], ['Fonte', l.source ?? '?'], ['Estado', l.active ? 'Ativo' : 'Retirado'],
+    ]
+    body = <>
+      <b>Anúncio · {fmtDate(l.first_seen, l.first_seen_uncertain)}</b>
+      {rows.map(([k, val]) => <div className="row" key={k}><span className="sub">{k}</span><span>{val}</span></div>)}
+      <h2 style={{ marginTop: 12 }}>Preços</h2>
+      {prices.map(p => <div className="row" key={p.id}><span className="sub">{fmtDate(p.at)}</span><span>{fmtPrice(p.price)}</span></div>)}
+      {!prices.length && <div className="sub">Sem preço registado.</div>}
+      {l.notes && <div className="note">{l.notes}</div>}
+      {l.url && <div style={{ marginTop: 10 }}><a href={l.url} target="_blank" rel="noreferrer">Abrir anúncio ↗</a></div>}
+      <button className="btn sec" style={{ width: '100%', marginTop: 12 }} onClick={() => go(`/p/${bid}/anuncio/${l.id}`)}>Editar · novo preço · retirar</button>
+    </>
+  }
+  return <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="panel">{body}<button className="btn" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>Fechar</button></div>
+  </div>
+}
