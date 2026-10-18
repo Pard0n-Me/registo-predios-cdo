@@ -26,8 +26,8 @@ Cria um repositório **privado** vazio chamado `registo-predios-cdo` (sem README
 1. **Add New › Project** › importa o repositório `registo-predios-cdo`.
 2. Framework: Vite (detetado automaticamente). Root directory: a raiz do repositório.
 3. **Environment Variables**:
-   - `VITE_SUPABASE_URL` = Project URL
-   - `VITE_SUPABASE_ANON_KEY` = anon key
+   - `VITE_SUPABASE_URL` = `https://aolfoswflslffzdwtbrq.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY` = a publishable key (`sb_publishable_…`)
 4. **Deploy**. Fica com um endereço tipo `registo-predios-cdo.vercel.app`.
 5. De volta à Supabase, em **Authentication › URL Configuration**, põe esse endereço em **Site URL**.
 
