@@ -138,5 +138,6 @@ export interface BuildingSummary {
   building: Building
   lastVisit: string | null
   activeListings: number
+  activeFsbo: number
   visitCount: number
 }

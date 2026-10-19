@@ -1,7 +1,7 @@
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
-import { geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
+import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
 import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel, statusLabel } from '../ui'
 
@@ -135,7 +135,7 @@ export default function BuildingPage({ id }: { id: string }) {
         <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
         <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
       </div>
-      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} />}
+      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
     </>
   )
 }
@@ -154,8 +154,20 @@ function listingLine(l: Listing, f: BuildingFull) {
   return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · retirado</span>}</>
 }
 
-function Detail({ ev, f, onClose }: { ev: Ev; f: BuildingFull; onClose: () => void }) {
+function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClose: () => void; onDeleted: () => void }) {
   const bid = f.building.id
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [delErr, setDelErr] = useState('')
+  const remove = async () => {
+    setBusy(true); setDelErr('')
+    try { if (ev.kind === 'visit') await deleteVisit(ev.v.id); else await deleteListing(ev.l); onDeleted() }
+    catch (e) { setDelErr('Não apagou: ' + (e as Error).message); setBusy(false) }
+  }
+  const what = ev.kind === 'visit' ? 'esta visita' : 'este anúncio'
+  const consequence = ev.kind === 'visit'
+    ? 'Os resultados por fração desta visita desaparecem. As pessoas e as conversas ficam, sem ligação à visita.'
+    : 'O anúncio e o histórico de preços desaparecem.'
   let body
   if (ev.kind === 'visit') {
     const v = ev.v
@@ -208,6 +220,18 @@ function Detail({ ev, f, onClose }: { ev: Ev; f: BuildingFull; onClose: () => vo
     </>
   }
   return <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>
-    <div className="panel">{body}<button className="btn" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>Fechar</button></div>
+    <div className="panel">{body}
+      <button className="btn" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>Fechar</button>
+      {!confirm
+        ? <button className="linkbtn" style={{ color: 'var(--bad)', marginTop: 12 }} onClick={() => setConfirm(true)}>Apagar {what}</button>
+        : <div className="note" style={{ marginTop: 12 }}>
+            <b>Apagar {what} de vez?</b> {consequence}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="btn sec" disabled={busy} onClick={() => setConfirm(false)}>Cancelar</button>
+              <button className="btn" style={{ background: 'var(--bad)' }} disabled={busy} onClick={remove}>{busy ? 'A apagar…' : 'Apagar'}</button>
+            </div>
+          </div>}
+      {delErr && <div className="err">{delErr}</div>}
+    </div>
   </div>
 }

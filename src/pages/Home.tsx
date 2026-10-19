@@ -1,10 +1,13 @@
 import Reload from '../components/Reload'
 import { useEffect, useMemo, useState } from 'react'
+import { buildExports, download } from '../data/export'
 import MapView, { type Pin } from '../components/MapView'
 import { listBuildings, norm } from '../data/store'
 import type { BuildingSummary } from '../types'
 import { fmtDate, go } from '../ui'
 
+type Show = 'todos' | 'ativos' | 'fsbo'
+const loadShow = (): Show => { try { return (localStorage.getItem('filtro-predios') as Show) || 'todos' } catch { return 'todos' } }
 type Sort = 'visita' | 'criado' | 'rua' | 'perto'
 const SORTS: [Sort, string][] = [['visita', 'Última visita'], ['criado', 'Mais recentes'], ['rua', 'Rua (A–Z)'], ['perto', 'Mais perto']]
 const loadSort = (): Sort => { try { return (localStorage.getItem('ordem-predios') as Sort) || 'visita' } catch { return 'visita' } }
@@ -43,6 +46,9 @@ export default function Home() {
   const [q, setQ] = useState('')
   const [locate, setLocate] = useState(0)
   const [sort, setSort] = useState<Sort>(loadSort)
+  const [show, setShow] = useState<Show>(loadShow)
+  const chooseShow = (v: Show) => { setShow(v); try { localStorage.setItem('filtro-predios', v) } catch { /* ignora */ } }
+  const passes = (s: BuildingSummary) => show === 'todos' || (show === 'ativos' ? s.activeListings > 0 : s.activeFsbo > 0)
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null)
   const [geoErr, setGeoErr] = useState('')
   const chooseSort = (v: Sort) => {
@@ -60,7 +66,7 @@ export default function Home() {
   const filtered = useMemo(() => {
     if (!items) return []
     const nq = norm(q)
-    const list = nq ? items.filter(s => norm(`${s.building.street} ${s.building.number}`).includes(nq)) : items
+    const list = (nq ? items.filter(s => norm(`${s.building.street} ${s.building.number}`).includes(nq)) : items).filter(passes)
     const byStreet = (a: BuildingSummary, b: BuildingSummary) =>
       a.building.street.localeCompare(b.building.street, 'pt') || a.building.number.localeCompare(b.building.number, 'pt', { numeric: true })
     const cmp: Record<Sort, (a: BuildingSummary, b: BuildingSummary) => number> = {
@@ -70,12 +76,12 @@ export default function Home() {
       perto: (a, b) => here ? dist(here, a.building.lat, a.building.lng) - dist(here, b.building.lat, b.building.lng) || byStreet(a, b) : byStreet(a, b),
     }
     return [...list].sort(cmp[sort])
-  }, [items, q, sort, here])
+  }, [items, q, sort, here, show]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pins: Pin[] = useMemo(() => (items ?? []).filter(s => s.building.lat != null && s.building.lng != null).map(s => ({
+  const pins: Pin[] = useMemo(() => (items ?? []).filter(s => s.building.lat != null && s.building.lng != null && passes(s)).map(s => ({
     id: s.building.id, lat: s.building.lat!, lng: s.building.lng!, color: pinColor(s), label: s.building.number,
     title: `${s.building.street}, ${s.building.number}`,
-  })), [items])
+  })), [items, show]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = () => {
     const a = splitAddress(q)
@@ -115,7 +121,12 @@ export default function Home() {
                 {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
+            <div className="seg" style={{ marginBottom: 4 }}>
+              {([['todos', 'Todos'], ['ativos', 'Com anúncio ativo'], ['fsbo', 'Só FSBO']] as [Show, string][]).map(([v, l]) =>
+                <button key={v} className={'chip' + (show === v ? ' on' : '')} onClick={() => chooseShow(v)}>{l}</button>)}
+            </div>
             {geoErr && sort === 'perto' && <div className="sub">{geoErr}</div>}
+            {items && !!items.length && !filtered.length && <div className="sub" style={{ marginTop: 8 }}>Nenhum prédio com este filtro.</div>}
             {filtered.map(s => (
               <div key={s.building.id} className="row click" onClick={() => go(`/p/${s.building.id}`)}>
                 <div><b>{s.building.street}, {s.building.number}</b><div className="sub">{summaryLine(s)}</div></div>
@@ -125,7 +136,32 @@ export default function Home() {
             {items && !items.length && <div className="sub">Ainda não há prédios. Pesquisa uma morada e cria o primeiro.</div>}
           </div>
         )}
+        {!q && items && !!items.length && <ExportCard />}
       </main>
     </>
+  )
+}
+
+function ExportCard() {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const run = async (which: 'fracoes' | 'visitas' | 'anuncios') => {
+    setBusy(true); setMsg('')
+    try {
+      const x = await buildExports()
+      download(`registo-predios-${which}-${new Date().toISOString().slice(0, 10)}.csv`, x[which])
+      setMsg(`${x.counts[which]} linhas exportadas.`)
+    } catch (e) { setMsg('Não exportou: ' + (e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="card">
+      <h2>Exportar para Excel</h2>
+      <div className="seg">
+        <button className="btn sec small" disabled={busy} onClick={() => run('fracoes')}>Prédios e frações</button>
+        <button className="btn sec small" disabled={busy} onClick={() => run('visitas')}>Visitas</button>
+        <button className="btn sec small" disabled={busy} onClick={() => run('anuncios')}>Anúncios</button>
+      </div>
+      <div className="sub" style={{ marginTop: 6 }}>{msg || 'Ficheiros CSV que abrem no Excel ou no Numbers. Têm contactos: guarda-os só para ti.'}</div>
+    </div>
   )
 }

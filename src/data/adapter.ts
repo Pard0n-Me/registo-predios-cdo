@@ -12,6 +12,7 @@ export interface Adapter {
   insert<T>(table: string, row: Row): Promise<T>
   update<T>(table: string, id: string, patch: Row): Promise<T>
   upsert(table: string, row: Row, keys: string[]): Promise<void>
+  remove(table: string, id: string): Promise<void>
 }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -37,6 +38,7 @@ function supabaseAdapter(sb: SupabaseClient): Adapter {
     async upsert(table: string, row: Row, keys: string[]) {
       check(await sb.from(table).upsert(row, { onConflict: keys.join(',') }))
     },
+    async remove(table: string, id: string) { check(await sb.from(table).delete().eq('id', id)) },
   }
 }
 
@@ -68,6 +70,14 @@ function demoAdapter(): Adapter {
     async upsert(table: string, row: Row, keys: string[]) {
       const r = t(table).find(x => keys.every(k => x[k] === row[k]))
       if (r) Object.assign(r, row); else t(table).push({ ...row })
+      save()
+    },
+    async remove(table: string, id: string) {
+      // imita as regras da base: apagar uma visita leva os resultados; um anúncio leva os preços
+      const child: Record<string, [string, string]> = { visits: ['visit_results', 'visit_id'], listings: ['listing_prices', 'listing_id'] }
+      db[table] = t(table).filter(x => x.id !== id)
+      const c = child[table]; if (c) db[c[0]] = t(c[0]).filter(x => x[c[1]] !== id)
+      for (const n of ['interactions', 'unit_notes']) if (table === 'visits') t(n).forEach(x => { if (x.visit_id === id) x.visit_id = null })
       save()
     },
   }

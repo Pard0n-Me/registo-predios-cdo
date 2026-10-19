@@ -13,7 +13,8 @@ export async function listBuildings(): Promise<BuildingSummary[]> {
   return buildings.map(b => {
     const vs = visits.filter(v => v.building_id === b.id)
     const last = vs.map(v => v.visited_at).sort().at(-1) ?? null
-    return { building: b, lastVisit: last, visitCount: vs.length, activeListings: listings.filter(l => l.building_id === b.id && l.active).length }
+    return { building: b, lastVisit: last, visitCount: vs.length, activeListings: listings.filter(l => l.building_id === b.id && l.active).length,
+      activeFsbo: listings.filter(l => l.building_id === b.id && l.active && l.advertiser_type === 'particular').length }
   })
 }
 
@@ -119,6 +120,16 @@ export async function saveVisit(v: VisitInput): Promise<Visit> {
   return visit
 }
 
+export async function deleteVisit(id: string) { return db.remove('visits', id) }
+/** Apaga o anúncio (e os preços). Se a fração ficou sem anúncios ativos, deixa de estar marcada como à venda. */
+export async function deleteListing(l: Listing) {
+  await db.remove('listings', l.id)
+  if (!l.unit_id) return
+  const others = (await db.where<Listing>('listings', 'unit_id', l.unit_id)).filter(x => x.active)
+  const [u] = await db.where<Unit>('units', 'id', l.unit_id)
+  if (!others.length && u && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
+}
+
 export async function updateUnit(id: string, patch: Partial<Unit>) { return db.update<Unit>('units', id, patch) }
 export async function updatePerson(id: string, patch: Partial<Person>) { return db.update<Person>('people', id, patch) }
 export async function addUnitNote(unitId: string, text: string, source: string | null) {
@@ -160,8 +171,9 @@ export function norm(s: string) {
 }
 
 export async function geocode(street: string, number: string): Promise<{ lat: number; lng: number } | null> {
-  const q = encodeURIComponent(`${street} ${number}, Lisboa, Portugal`)
-  const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`, { headers: { 'Accept-Language': 'pt' } })
+  // Só dentro de Campo de Ourique: há ruas com o mesmo nome noutras zonas (ex.: Rua 4 de Infantaria).
+  const q = new URLSearchParams({ format: 'json', limit: '1', street: `${number} ${street}`, city: 'Lisboa', viewbox: '-9.1780,38.7250,-9.1540,38.7110', bounded: '1' })
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?${q}`, { headers: { 'Accept-Language': 'pt' } })
   if (!r.ok) return null
   const j = (await r.json()) as { lat: string; lon: string }[]
   return j[0] ? { lat: +j[0].lat, lng: +j[0].lon } : null
