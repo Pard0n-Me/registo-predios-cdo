@@ -69,6 +69,10 @@ textarea.t{min-height:72px;resize:vertical}
 .note{font-size:13px;color:var(--muted);background:var(--grey-soft);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap}
 .banner{font-size:12px;background:#1d2329;color:#fff;text-align:center;padding:6px 10px}
 .err{color:var(--bad);font-size:14px;margin-top:8px}
-.floor-edit{display:grid;grid-template-columns:70px 1fr 32px;gap:6px;margin-bottom:6px}
+.floor-edit{display:grid;grid-template-columns:64px 1fr 32px;gap:6px;margin-bottom:8px;align-items:start}
+.doors{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.t.door{width:64px;padding:8px 6px;text-align:center}
+.x{min-width:32px;min-height:38px}
+.x:disabled{opacity:.35}
 .x{border:0;background:var(--grey-soft);border-radius:8px;cursor:pointer;color:var(--muted);font-size:16px}
 .leaflet-container{font:inherit}

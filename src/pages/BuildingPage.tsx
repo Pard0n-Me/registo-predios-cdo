@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getBuildingFull, unitLabel } from '../data/store'
+import MapView from '../components/MapView'
+import { geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
 import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel, statusLabel } from '../ui'
 
@@ -28,6 +29,8 @@ export default function BuildingPage({ id }: { id: string }) {
   const [f, setF] = useState<BuildingFull | null>(null)
   const [err, setErr] = useState('')
   const [open, setOpen] = useState<Ev | null>(null)
+  const [moving, setMoving] = useState(false)
+  const [posMsg, setPosMsg] = useState('')
   useEffect(() => { getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }, [id])
   if (err) return <main><div className="err">{err}</div></main>
   if (!f) return <main><div className="sub" style={{ padding: 20 }}>A carregar…</div></main>
@@ -90,6 +93,29 @@ export default function BuildingPage({ id }: { id: string }) {
             <span><i className="dot" style={{ background: 'var(--warn)' }} />Caixa cheia</span>
             <span><i className="dot" style={{ background: 'var(--bad)' }} />À venda</span>
           </div>
+        </div>
+
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <h2 style={{ margin: 0 }}>Localização</h2>
+            {b.lat != null
+              ? <button className="btn sec small" onClick={() => { setMoving(m => !m); setPosMsg('') }}>{moving ? 'Concluir' : 'Mover pino'}</button>
+              : <button className="btn sec small" onClick={async () => {
+                  const g = await geocode(b.street, b.number).catch(() => null)
+                  if (!g) { setPosMsg('Não encontrei a morada. Edita o prédio e toca no mapa.'); return }
+                  await setBuildingPosition(b.id, g.lat, g.lng); setF({ ...f, building: { ...b, ...g } }); setMoving(true)
+                  setPosMsg('Localizado pela morada. Confirma: arrasta o pino para cima do prédio, se for preciso.')
+                }}>Localizar</button>}
+          </div>
+          {moving && !posMsg && <div className="sub" style={{ marginTop: 6 }}>Arrasta o pino para cima do prédio. Grava sozinho ao largar.</div>}
+          {posMsg && <div className="sub" style={{ marginTop: 6 }}>{posMsg}</div>}
+          {b.lat != null && <MapView small pins={[{ id: b.id, lat: b.lat, lng: b.lng!, color: '#0f5c8c', label: b.number, title: '' }]}
+            center={[b.lat, b.lng!]} draggableId={moving ? b.id : null}
+            onDragEnd={async (_id, lat, lng) => {
+              try { await setBuildingPosition(b.id, lat, lng); setF({ ...f, building: { ...b, lat, lng } }); setPosMsg('Posição gravada.') }
+              catch (e) { setPosMsg('Não gravou: ' + (e as Error).message) }
+            }} />}
+          {b.lat == null && !posMsg && <div className="sub" style={{ marginTop: 6 }}>Sem posição: este prédio não aparece no mapa.</div>}
         </div>
 
         <div className="card">

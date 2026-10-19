@@ -14,6 +14,19 @@ const PATTERNS: [string, string[]][] = [
   ['1 por piso', ['']], ['Esq · Dto', ['Esq', 'Dto']], ['Esq · Fte · Dto', ['Esq', 'Fte', 'Dto']], ['A · B', ['A', 'B']], ['A · B · C · D', ['A', 'B', 'C', 'D']],
 ]
 
+/** Portas de um piso com mais ou menos uma fração, mantendo o esquema de nomes (Esq/Fte/Dto ou letras). */
+const SIDES: string[][] = [[''], ['Esq', 'Dto'], ['Esq', 'Fte', 'Dto']]
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+function resize(doors: string[], delta: number): string[] {
+  const n = Math.max(1, Math.min(26, doors.length + delta))
+  const sidesNow = SIDES.findIndex(s => s.join() === doors.join())
+  const isLetters = doors.length > 0 && doors.every((d, i) => d === LETTERS[i])
+  if ((sidesNow >= 0 || (doors.length === 1 && doors[0] === '')) && n <= 3) return [...SIDES[n - 1]]
+  if (sidesNow >= 0 || isLetters || doors.every(d => !d)) return n === 1 ? [''] : LETTERS.slice(0, n).split('')
+  // nomes personalizados: acrescenta ou retira no fim
+  return delta > 0 ? [...doors, LETTERS[doors.length] ?? String(doors.length + 1)] : doors.slice(0, n)
+}
+
 function Seg<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return <div className="seg">{options.map(([v, l]) => <button type="button" key={v} className={'chip' + (v === value ? ' on' : '')} onClick={() => onChange(v)}>{l}</button>)}</div>
 }
@@ -23,8 +36,9 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [gen, setGen] = useState({ floors: 4, rc: true, cave: false, pattern: 1 })
+  const [focus, setFocus] = useState<[number, number] | null>(null)
 
-  useEffect(() => { if (id) getBuildingFull(id).then(f => setB(f.building)).catch(e => setErr(e.message)) }, [id])
+  useEffect(() => { if (id) getBuildingFull(id).then(f => { setB(f.building); if (f.building.lat != null) setFocus([f.building.lat, f.building.lng!]) }).catch(e => setErr(e.message)) }, [id])
   const set = <K extends keyof Building>(k: K, v: Building[K]) => setB(x => ({ ...x, [k]: v }))
   const floors = b.floors ?? []
 
@@ -42,7 +56,7 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
     setErr('')
     if (!b.street || !b.number) { setErr('Falta a rua e o número.'); return }
     const g = await geocode(b.street, b.number).catch(() => null)
-    if (g) setB(x => ({ ...x, lat: g.lat, lng: g.lng }))
+    if (g) { setB(x => ({ ...x, lat: g.lat, lng: g.lng })); setFocus([g.lat, g.lng]) }
     else setErr('Não encontrei a morada no mapa. Toca no mapa para marcar o prédio.')
   }
 
@@ -51,7 +65,9 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
     if (!b.street?.trim() || !b.number?.trim()) { setErr('Rua e número são obrigatórios.'); return }
     setBusy(true)
     try {
-      const saved = await saveBuilding({ ...b, street: b.street.trim(), number: b.number.trim() } as Building)
+      let pos = {}
+      if (b.lat == null) { const g = await geocode(b.street.trim(), b.number.trim()).catch(() => null); if (g) pos = { lat: g.lat, lng: g.lng } }
+      const saved = await saveBuilding({ ...b, ...pos, street: b.street.trim(), number: b.number.trim() } as Building)
       location.replace(`#/p/${saved.id}`)
     } catch (e) {
       const m = (e as Error).message
@@ -75,10 +91,11 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
             <button className="btn sec small" onClick={locate}>📍 Localizar no mapa</button>
-            <span className="sub">{b.lat != null ? 'Posição marcada. Toca no mapa para corrigir.' : 'Sem posição'}</span>
+            <span className="sub">{b.lat != null ? 'Arrasta o pino (ou toca no mapa) para o pôr em cima do prédio.' : 'Sem posição: é localizado ao gravar.'}</span>
           </div>
           <MapView small pins={b.lat != null ? [{ id: 'x', lat: b.lat!, lng: b.lng!, color: '#0f5c8c', label: b.number || '•', title: '' }] : []}
-            center={b.lat != null ? [b.lat!, b.lng!] : null} onMapTap={(lat, lng) => setB(x => ({ ...x, lat, lng }))} />
+            center={focus} draggableId="x" onDragEnd={(_id, lat, lng) => setB(x => ({ ...x, lat, lng }))}
+            onMapTap={(lat, lng) => setB(x => ({ ...x, lat, lng }))} />
         </div>
 
         <div className="card">
@@ -93,12 +110,19 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
             <button className={'chip' + (gen.cave ? ' on' : '')} onClick={() => setGen({ ...gen, cave: !gen.cave })}>Cave</button>
             <button className="btn sec small" style={{ marginLeft: 'auto' }} onClick={generate}>Gerar grelha</button>
           </div>
-          {!!floors.length && <div className="sub" style={{ margin: '12px 0 6px' }}>Ajusta piso a piso (portas separadas por vírgula; vazio = 1 por piso):</div>}
+          {!!floors.length && <div className="sub" style={{ margin: '12px 0 6px' }}>Ajusta piso a piso: − e + mudam o número de frações; toca num nome para o mudar.</div>}
           {floors.map((f, i) => (
             <div className="floor-edit" key={i}>
-              <input className="t" value={f.label} onChange={e => setFloor(i, { ...f, label: e.target.value })} />
-              <input className="t" value={f.doors.join(', ')} onChange={e => setFloor(i, { ...f, doors: e.target.value.split(',').map(s => s.trim()).filter((s, _k, a) => s || a.length === 1) })} />
-              <button className="x" onClick={() => set('floors', floors.filter((_, j) => j !== i))}>✕</button>
+              <input className="t" aria-label="Piso" value={f.label} onChange={e => setFloor(i, { ...f, label: e.target.value })} />
+              <div className="doors">
+                {f.doors.map((d, k) => (
+                  <input key={k} className="t door" aria-label={`Porta ${k + 1} do ${f.label}`} value={d} placeholder={f.doors.length === 1 ? 'única' : ''}
+                    onChange={e => setFloor(i, { ...f, doors: f.doors.map((x, j) => (j === k ? e.target.value.trim() : x)) })} />
+                ))}
+                <button type="button" className="x" aria-label={`Menos uma fração no ${f.label}`} disabled={f.doors.length <= 1} onClick={() => setFloor(i, { ...f, doors: resize(f.doors, -1) })}>−</button>
+                <button type="button" className="x" aria-label={`Mais uma fração no ${f.label}`} onClick={() => setFloor(i, { ...f, doors: resize(f.doors, 1) })}>+</button>
+              </div>
+              <button type="button" className="x" aria-label={`Apagar o piso ${f.label}`} onClick={() => set('floors', floors.filter((_, j) => j !== i))}>✕</button>
             </div>
           ))}
           {!!floors.length && <button className="linkbtn" onClick={() => set('floors', [{ label: '', doors: [''] }, ...floors])}>+ piso no topo</button>}

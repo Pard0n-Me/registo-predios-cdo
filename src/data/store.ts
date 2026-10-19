@@ -56,6 +56,10 @@ export async function saveBuilding(b: Partial<Building> & { street: string; numb
   return saved
 }
 
+export async function setBuildingPosition(id: string, lat: number, lng: number) {
+  return db.update<Building>('buildings', id, { lat, lng })
+}
+
 export async function ensureUnit(buildingId: string, label: string): Promise<Unit> {
   const found = (await db.where<Unit>('units', 'building_id', buildingId)).find(u => u.label === label)
   return found ?? db.insert<Unit>('units', { building_id: buildingId, label, condition: '?', commercial_status: 'nada' })

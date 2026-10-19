@@ -4,6 +4,13 @@ import { listBuildings, norm } from '../data/store'
 import type { BuildingSummary } from '../types'
 import { fmtDate, go } from '../ui'
 
+type Sort = 'visita' | 'criado' | 'rua' | 'perto'
+const SORTS: [Sort, string][] = [['visita', 'Última visita'], ['criado', 'Mais recentes'], ['rua', 'Rua (A–Z)'], ['perto', 'Mais perto']]
+const loadSort = (): Sort => { try { return (localStorage.getItem('ordem-predios') as Sort) || 'visita' } catch { return 'visita' } }
+/** Distância aproximada em metros (suficiente para ordenar dentro do bairro). */
+const dist = (a: { lat: number; lng: number }, lat: number | null, lng: number | null) =>
+  lat == null || lng == null ? Infinity : Math.hypot((lat - a.lat) * 111_000, (lng - a.lng) * 87_000)
+
 const SIX_MONTHS = 1000 * 60 * 60 * 24 * 182
 
 function pinColor(s: BuildingSummary): string {
@@ -34,6 +41,18 @@ export default function Home() {
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [locate, setLocate] = useState(0)
+  const [sort, setSort] = useState<Sort>(loadSort)
+  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null)
+  const [geoErr, setGeoErr] = useState('')
+  const chooseSort = (v: Sort) => {
+    setSort(v); try { localStorage.setItem('ordem-predios', v) } catch { /* ignora */ }
+    if (v === 'perto' && !here) {
+      setGeoErr('')
+      navigator.geolocation?.getCurrentPosition(p => setHere({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => setGeoErr('Sem acesso à localização: autoriza-a no Safari para ordenar por distância.'), { enableHighAccuracy: true, timeout: 10000 })
+    }
+  }
+  useEffect(() => { if (sort === 'perto') chooseSort('perto') }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { listBuildings().then(setItems).catch(e => setErr(String(e.message ?? e))) }, [])
 
@@ -41,8 +60,16 @@ export default function Home() {
     if (!items) return []
     const nq = norm(q)
     const list = nq ? items.filter(s => norm(`${s.building.street} ${s.building.number}`).includes(nq)) : items
-    return [...list].sort((a, b) => (b.lastVisit ?? '').localeCompare(a.lastVisit ?? '') || a.building.street.localeCompare(b.building.street))
-  }, [items, q])
+    const byStreet = (a: BuildingSummary, b: BuildingSummary) =>
+      a.building.street.localeCompare(b.building.street, 'pt') || a.building.number.localeCompare(b.building.number, 'pt', { numeric: true })
+    const cmp: Record<Sort, (a: BuildingSummary, b: BuildingSummary) => number> = {
+      visita: (a, b) => (b.lastVisit ?? '').localeCompare(a.lastVisit ?? '') || byStreet(a, b),
+      criado: (a, b) => (b.building.created_at ?? '').localeCompare(a.building.created_at ?? '') || byStreet(a, b),
+      rua: byStreet,
+      perto: (a, b) => here ? dist(here, a.building.lat, a.building.lng) - dist(here, b.building.lat, b.building.lng) || byStreet(a, b) : byStreet(a, b),
+    }
+    return [...list].sort(cmp[sort])
+  }, [items, q, sort, here])
 
   const pins: Pin[] = useMemo(() => (items ?? []).filter(s => s.building.lat != null && s.building.lng != null).map(s => ({
     id: s.building.id, lat: s.building.lat!, lng: s.building.lng!, color: pinColor(s), label: s.building.number,
@@ -81,7 +108,13 @@ export default function Home() {
         {err && <div className="err">{err}</div>}
         {!q && (
           <div className="card">
-            <h2>Prédios ({items?.length ?? '…'})</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <h2 style={{ margin: 0 }}>Prédios ({items?.length ?? '…'})</h2>
+              <select className="t" style={{ width: 'auto', padding: '6px 8px', fontSize: 14 }} aria-label="Ordenar prédios" value={sort} onChange={e => chooseSort(e.target.value as Sort)}>
+                {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            {geoErr && sort === 'perto' && <div className="sub">{geoErr}</div>}
             {filtered.map(s => (
               <div key={s.building.id} className="row click" onClick={() => go(`/p/${s.building.id}`)}>
                 <div><b>{s.building.street}, {s.building.number}</b><div className="sub">{summaryLine(s)}</div></div>
