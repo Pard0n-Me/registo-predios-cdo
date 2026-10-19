@@ -20,9 +20,11 @@ function fanOffsets(m: L.Map, pins: Pin[]): Map<string, [number, number]> {
     group.forEach(g => used.add(g.p.id))
     if (group.length < 2) { out.set(a.p.id, [0, 0]); continue }
     group.sort((x, y) => x.p.label.localeCompare(y.p.label, 'pt', { numeric: true }))
+    // o raio cresce com o número de pinos, para caberem lado a lado à volta do círculo
+    const radius = Math.max(FAN, Math.ceil((group.length * (PIN + 4)) / (2 * Math.PI)))
     group.forEach((g, i) => {
       const ang = -Math.PI / 2 + (2 * Math.PI * i) / group.length
-      out.set(g.p.id, [Math.round(FAN * Math.cos(ang)), Math.round(FAN * Math.sin(ang))])
+      out.set(g.p.id, [Math.round(radius * Math.cos(ang)), Math.round(radius * Math.sin(ang))])
     })
   }
   return out
