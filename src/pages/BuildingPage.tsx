@@ -1,3 +1,4 @@
+import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
 import { geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
@@ -61,7 +62,7 @@ export default function BuildingPage({ id }: { id: string }) {
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Mapa</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button></header>
+      <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Mapa</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
       <main>
         <div className="card">
           <div className="sub">{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>

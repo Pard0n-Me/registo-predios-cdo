@@ -1,3 +1,4 @@
+import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { getPerson, updatePerson } from '../data/store'
 import type { Person } from '../types'
@@ -25,7 +26,7 @@ export default function PersonPage({ id }: { id: string }) {
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => history.back()}>‹ Voltar</button><h1>{p.name}</h1></header>
+      <header className="top"><button className="linkbtn" onClick={() => history.back()}>‹ Voltar</button><h1>{p.name}</h1><Reload /></header>
       <main>
         <div className="card">
           <label className="f">Nome</label><input className="t" value={p.name} onChange={e => set('name', e.target.value)} />

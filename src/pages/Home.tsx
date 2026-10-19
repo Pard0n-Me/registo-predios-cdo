@@ -1,3 +1,4 @@
+import Reload from '../components/Reload'
 import { useEffect, useMemo, useState } from 'react'
 import MapView, { type Pin } from '../components/MapView'
 import { listBuildings, norm } from '../data/store'
@@ -83,7 +84,7 @@ export default function Home() {
 
   return (
     <>
-      <header className="top"><h1>Campo de Ourique</h1><button className="linkbtn" onClick={() => go('/novo')}>+ Prédio</button></header>
+      <header className="top"><h1>Campo de Ourique</h1><button className="linkbtn" onClick={() => go('/novo')}>+ Prédio</button><Reload /></header>
       <main>
         <div className="search">🔎<input value={q} onChange={e => setQ(e.target.value)} placeholder="Rua e número, ex.: correia teles 90" autoCapitalize="off" autoCorrect="off" enterKeyHint="search" />{q && <button className="linkbtn" onClick={() => setQ('')}>✕</button>}</div>
         {q && (

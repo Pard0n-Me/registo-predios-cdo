@@ -1,3 +1,4 @@
+import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { addUnitNote, getBuildingFull, updateUnit } from '../data/store'
 import type { BuildingFull, CommercialStatus, Cond, Unit } from '../types'
@@ -29,7 +30,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => go(`/p/${buildingId}`)}>‹ Prédio</button><h1>{f.building.street.replace(/^Rua /, 'R. ')}, {f.building.number} · {u.label}</h1></header>
+      <header className="top"><button className="linkbtn" onClick={() => go(`/p/${buildingId}`)}>‹ Prédio</button><h1>{f.building.street.replace(/^Rua /, 'R. ')}, {f.building.number} · {u.label}</h1><Reload /></header>
       <main>
         <div className="card">
           <div className="two">
