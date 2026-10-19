@@ -1,3 +1,4 @@
+import { flash } from '../components/Toast'
 import { useEffect, useState } from 'react'
 import { getBuildingFull, saveListing } from '../data/store'
 import type { BuildingFull, Listing } from '../types'
@@ -31,6 +32,7 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
     try {
       const p = price ? +price.replace(/[^\d]/g, '') : null
       await saveListing({ ...l, building_id: buildingId, price: p, price_at: listingId ? priceAt : l.first_seen })
+      flash(listingId ? 'Anúncio atualizado' : 'Anúncio gravado')
       location.replace(`#/p/${buildingId}`)
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }

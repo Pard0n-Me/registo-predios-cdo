@@ -1,3 +1,4 @@
+import Toast from './components/Toast'
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { db, resetDemo, supabase } from './data/adapter'
@@ -60,6 +61,7 @@ export default function App() {
   return (
     <div className="phone">
       {db.demo && <div className="banner">Modo demonstração · dados fictícios só neste aparelho · <button className="linkbtn" style={{ color: '#fff', fontSize: 12, textDecoration: 'underline' }} onClick={resetDemo}>repor</button></div>}
+      <Toast />
       {supabase && session === undefined ? null : supabase && !session ? <Login /> : route(hash)}
     </div>
   )

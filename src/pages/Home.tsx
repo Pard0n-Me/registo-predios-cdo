@@ -1,3 +1,4 @@
+import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useMemo, useState } from 'react'
 import { buildExports, download } from '../data/export'
@@ -92,7 +93,7 @@ export default function Home() {
     <>
       <header className="top"><h1>Campo de Ourique</h1><button className="linkbtn" onClick={() => go('/novo')}>+ Prédio</button><Reload /></header>
       <main>
-        <div className="search">🔎<input value={q} onChange={e => setQ(e.target.value)} placeholder="Rua e número, ex.: correia teles 90" autoCapitalize="off" autoCorrect="off" enterKeyHint="search" />{q && <button className="linkbtn" onClick={() => setQ('')}>✕</button>}</div>
+        <div className="search"><Icon name="search" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Rua e número, ex.: correia teles 90" autoCapitalize="off" autoCorrect="off" enterKeyHint="search" />{q && <button className="linkbtn iconbtn" aria-label="Limpar pesquisa" onClick={() => setQ('')}><Icon name="x" /></button>}</div>
         {q && (
           <div className="card">
             {filtered.slice(0, 8).map(s => (
@@ -104,13 +105,17 @@ export default function Home() {
             <div style={{ marginTop: 10 }}><button className="btn sec small" onClick={create}>+ Criar prédio “{splitAddress(q).street}{splitAddress(q).number ? ', ' + splitAddress(q).number : ''}”</button></div>
           </div>
         )}
-        <MapView pins={pins} onPin={id => go(`/p/${id}`)} locateSignal={locate} />
-        <div className="legend">
-          <span><i className="dot" style={{ background: '#a63a32' }} />Anúncio ativo</span>
-          <span><i className="dot" style={{ background: '#2f7d4f' }} />Visita &lt; 6 meses</span>
-          <span><i className="dot" style={{ background: '#b26a00' }} />Visita antiga / legado</span>
-          <span><i className="dot" style={{ background: '#9c958a' }} />Sem visitas</span>
-          <button className="linkbtn" style={{ marginLeft: 'auto', fontSize: 13 }} onClick={() => setLocate(x => x + 1)}>📍 Onde estou</button>
+        <div className="mapwrap">
+          <MapView pins={pins} onPin={id => go(`/p/${id}`)} locateSignal={locate} />
+          <button className="locate" aria-label="Onde estou" title="Onde estou" onClick={() => setLocate(x => x + 1)}>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+          </button>
+          <div className="maplegend" aria-label="Legenda">
+            <span><i className="dot" style={{ background: '#a63a32' }} />Anúncio</span>
+            <span><i className="dot" style={{ background: '#2f7d4f' }} />&lt; 6 meses</span>
+            <span><i className="dot" style={{ background: '#b26a00' }} />Antiga</span>
+            <span><i className="dot" style={{ background: '#9c958a' }} />Nunca</span>
+          </div>
         </div>
         {err && <div className="err">{err}</div>}
         {!q && (
@@ -121,9 +126,9 @@ export default function Home() {
                 {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
-            <div className="seg" style={{ marginBottom: 4 }}>
-              {([['todos', 'Todos'], ['ativos', 'Com anúncio ativo'], ['fsbo', 'Só FSBO']] as [Show, string][]).map(([v, l]) =>
-                <button key={v} className={'chip' + (show === v ? ' on' : '')} onClick={() => chooseShow(v)}>{l}</button>)}
+            <div className="seg scroll-x" role="group" aria-label="Filtrar prédios" style={{ marginBottom: 4 }}>
+              {([['todos', 'Todos'], ['ativos', 'Anúncio ativo'], ['fsbo', 'Só FSBO']] as [Show, string][]).map(([v, l]) =>
+                <button key={v} className={'chip' + (show === v ? ' on' : '')} aria-pressed={show === v} onClick={() => chooseShow(v)}>{l}</button>)}
             </div>
             {geoErr && sort === 'perto' && <div className="sub">{geoErr}</div>}
             {items && !!items.length && !filtered.length && <div className="sub" style={{ marginTop: 8 }}>Nenhum prédio com este filtro.</div>}

@@ -1,3 +1,5 @@
+import { flash } from '../components/Toast'
+import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { addUnitNote, getBuildingFull, updateUnit } from '../data/store'
@@ -18,7 +20,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const save = async () => {
     try {
       await updateUnit(u.id, { typology: u.typology, area_m2: u.area_m2, condition: u.condition, commercial_status: u.commercial_status, pipedrive_deal_id: u.pipedrive_deal_id, notes: u.notes })
-      setDirty(false)
+      setDirty(false); flash('Fração gravada')
     } catch (e) { setErr((e as Error).message) }
   }
   const addNote = async () => { if (!note.trim()) return; await addUnitNote(u.id, note.trim(), null); setNote(''); load() }
@@ -54,7 +56,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
             <div key={p!.id} className="row click" onClick={() => go(`/pessoa/${p!.id}`)}>
               <div><b>{p!.name}</b> <span className="sub">· {roleLabel(pu.role)}</span>
                 <div className="sub">{[p!.phone, p!.traits].filter(Boolean).join(' · ')}</div></div>
-              {p!.phone ? <a href={`tel:${p!.phone}`} onClick={e => e.stopPropagation()}>📞</a> : '›'}
+              {p!.phone ? <a className="iconbtn" aria-label={`Ligar a ${p!.name}`} href={`tel:${p!.phone}`} onClick={e => e.stopPropagation()}><Icon name="phone" /></a> : '›'}
             </div>
           ))}
         </div>
@@ -83,7 +85,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           {history.map(({ v, r }) => <div key={v.id} className="row" style={{ display: 'block' }}>
             <span className="sub">{v.year_uncertain ? fmtDate(v.visited_at, true) : fmtDateTime(v.visited_at)}{v.companion ? ` · com ${v.companion}` : ''}</span>
             <div>{r!.outcomes.map(outcomeLabel).join(' + ')}{r!.note ? ` · ${r!.note}` : ''}</div>
-            {f.interactions.filter(i => i.visit_id === v.id && i.unit_id === u.id).map(i => <div key={i.id} className="sub">👤 {f.people.find(p => p.id === i.person_id)?.name}: {i.notes ?? '—'}</div>)}
+            {f.interactions.filter(i => i.visit_id === v.id && i.unit_id === u.id).map(i => <div key={i.id} className="sub"><Icon name="user" size={13} /> {f.people.find(p => p.id === i.person_id)?.name}: {i.notes ?? '—'}</div>)}
           </div>)}
         </div>
       </main>

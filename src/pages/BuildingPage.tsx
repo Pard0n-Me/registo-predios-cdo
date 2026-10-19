@@ -1,3 +1,5 @@
+import { flash } from '../components/Toast'
+import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
@@ -66,7 +68,13 @@ export default function BuildingPage({ id }: { id: string }) {
       <main>
         <div className="card">
           <div className="sub">{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>
-          <div className="chips" style={{ marginTop: 10 }}>{chips(b).map(([t, c]) => <span key={t} className={'chip ' + c}>{t}</span>)}</div>
+          {(() => {
+            const all = chips(b), known = all.filter(([, c]) => c !== 'q'), unknown = all.length - known.length
+            return <div className="chips" style={{ marginTop: 10 }}>
+              {known.map(([t, c]) => <span key={t} className={'chip ' + c}>{t}</span>)}
+              {unknown > 0 && <button className="chip q" onClick={() => go(`/p/${id}/editar`)}>+ {unknown} por preencher</button>}
+            </div>
+          })()}
           {(b.condo_admin || b.notes) && <div className="note">{b.condo_admin ? `Administração: ${b.condo_admin}\n` : ''}{b.notes ?? ''}</div>}
         </div>
 
@@ -135,7 +143,7 @@ export default function BuildingPage({ id }: { id: string }) {
         <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
         <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
       </div>
-      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
+      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} onDeleted={() => { flash(open.kind === 'visit' ? 'Visita apagada' : 'Anúncio apagado'); setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
     </>
   )
 }
@@ -189,7 +197,7 @@ function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClos
             const p = f.people.find(x => x.id === i.person_id)
             const role = f.personUnits.find(pu => pu.person_id === i.person_id && pu.unit_id === r.unit_id)?.role
             return <div key={i.id} style={{ marginTop: 6 }}>
-              {p && <a className="chip ok" href={`#/pessoa/${p.id}`} style={{ textDecoration: 'none' }}>👤 {p.name}{role ? ` · ${roleLabel(role)}` : ''} ›</a>}
+              {p && <a className="chip ok" href={`#/pessoa/${p.id}`} style={{ textDecoration: 'none' }}><Icon name="user" size={14} /> {p.name}{role ? ` · ${roleLabel(role)}` : ''} ›</a>}
               {i.notes && <div className="sub" style={{ marginTop: 4 }}>{i.notes}</div>}
             </div>
           })}

@@ -1,3 +1,5 @@
+import { flash } from '../components/Toast'
+import Icon from '../components/Icon'
 import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
 import { geocode, getBuildingFull, saveBuilding } from '../data/store'
@@ -68,6 +70,7 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
       let pos = {}
       if (b.lat == null) { const g = await geocode(b.street.trim(), b.number.trim()).catch(() => null); if (g) pos = { lat: g.lat, lng: g.lng } }
       const saved = await saveBuilding({ ...b, ...pos, street: b.street.trim(), number: b.number.trim() } as Building)
+      flash(id ? 'Prédio atualizado' : 'Prédio criado')
       location.replace(`#/p/${saved.id}`)
     } catch (e) {
       const m = (e as Error).message
@@ -90,7 +93,7 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
             <div><label className="f">Gaveto / esquina</label><input className="t" value={b.corner_note ?? ''} onChange={e => set('corner_note', e.target.value || null)} /></div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
-            <button className="btn sec small" onClick={locate}>📍 Localizar no mapa</button>
+            <button className="btn sec small" onClick={locate}><Icon name="pin" size={16} /> Localizar no mapa</button>
             <span className="sub">{b.lat != null ? 'Arrasta o pino (ou toca no mapa) para o pôr em cima do prédio.' : 'Sem posição: é localizado ao gravar.'}</span>
           </div>
           <MapView small pins={b.lat != null ? [{ id: 'x', lat: b.lat!, lng: b.lng!, color: '#0f5c8c', label: b.number || '•', title: '' }] : []}

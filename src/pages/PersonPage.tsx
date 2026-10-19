@@ -1,3 +1,5 @@
+import { flash } from '../components/Toast'
+import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { getPerson, updatePerson } from '../data/store'
@@ -16,7 +18,7 @@ export default function PersonPage({ id }: { id: string }) {
 
   const set = <K extends keyof Person>(k: K, v: Person[K]) => { setP({ ...p, [k]: v }); setDirty(true) }
   const save = async () => {
-    try { await updatePerson(p.id, { name: p.name, phone: p.phone, email: p.email, traits: p.traits, notes: p.notes, pipedrive_person_id: p.pipedrive_person_id }); setDirty(false) }
+    try { await updatePerson(p.id, { name: p.name, phone: p.phone, email: p.email, traits: p.traits, notes: p.notes, pipedrive_person_id: p.pipedrive_person_id }); setDirty(false); flash('Pessoa gravada') }
     catch (e) { setErr((e as Error).message) }
   }
   const where = (unitId: string | null) => {
@@ -35,9 +37,9 @@ export default function PersonPage({ id }: { id: string }) {
             <div><label className="f">Email</label><input className="t" type="email" value={p.email ?? ''} onChange={e => set('email', e.target.value || null)} /></div>
           </div>
           {(p.phone || p.email) && <div className="seg" style={{ marginTop: 8 }}>
-            {p.phone && <a className="chip acc" href={`tel:${p.phone}`}>📞 Ligar</a>}
-            {p.phone && <a className="chip acc" href={`sms:${p.phone}`}>💬 SMS</a>}
-            {p.email && <a className="chip acc" href={`mailto:${p.email}`}>✉️ Email</a>}
+            {p.phone && <a className="chip acc" href={`tel:${p.phone}`}><Icon name="phone" size={15} /> Ligar</a>}
+            {p.phone && <a className="chip acc" href={`sms:${p.phone}`}><Icon name="message" size={15} /> SMS</a>}
+            {p.email && <a className="chip acc" href={`mailto:${p.email}`}><Icon name="mail" size={15} /> Email</a>}
           </div>}
           <label className="f">Traços para reconhecer</label><input className="t" value={p.traits ?? ''} onChange={e => set('traits', e.target.value || null)} />
           <label className="f">Notas</label><textarea className="t" value={p.notes ?? ''} onChange={e => set('notes', e.target.value || null)} />

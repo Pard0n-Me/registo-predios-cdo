@@ -1,3 +1,4 @@
+import { flash } from '../components/Toast'
 import { useEffect, useMemo, useState } from 'react'
 import { getBuildingFull, saveVisit, unitLabel, type ResultInput } from '../data/store'
 import type { BuildingFull, Outcome, Person, Role } from '../types'
@@ -29,6 +30,7 @@ export default function VisitPage({ id }: { id: string }) {
     try {
       await saveVisit({ buildingId: id, visitedAt: new Date(d.visitedAt).toISOString(), companion: d.companion, generalNote: d.generalNote, results: Object.values(d.results) })
       try { localStorage.removeItem(draftKey(id)) } catch { /* ignora */ }
+      flash(`Visita gravada${count ? ` · ${count} ${count === 1 ? 'porta' : 'portas'}` : ''}`)
       location.replace(`#/p/${id}`)
     } catch (e) { setErr((e as Error).message + ' · O rascunho continua guardado no telefone.') } finally { setBusy(false) }
   }
