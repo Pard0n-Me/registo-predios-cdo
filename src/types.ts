@@ -117,6 +117,8 @@ export interface Listing {
   source: string | null
   active: boolean
   notes: string | null
+  /** Quem atende o anúncio (dono num FSBO, agente num FSBA). Coluna acrescentada a 20/10. */
+  contact_person_id?: string | null
 }
 
 export interface ListingPrice { id: string; listing_id: string; at: string; price: number }

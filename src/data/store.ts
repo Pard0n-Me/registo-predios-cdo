@@ -32,7 +32,8 @@ export async function getBuildingFull(id: string): Promise<BuildingFull> {
     db.whereIn<Interaction>('interactions', 'unit_id', unitIds),
     db.whereIn<UnitNote>('unit_notes', 'unit_id', unitIds),
   ])
-  const people = await db.whereIn<Person>('people', 'id', [...new Set(personUnits.map(p => p.person_id))])
+  const contactIds = listings.map(l => l.contact_person_id).filter((x): x is string => !!x)
+  const people = await db.whereIn<Person>('people', 'id', [...new Set([...personUnits.map(p => p.person_id), ...contactIds])])
   visits.sort((a, b) => b.visited_at.localeCompare(a.visited_at))
   return { building, units, visits, results, listings, prices, people, personUnits, interactions, unitNotes }
 }
@@ -173,6 +174,14 @@ export async function deleteEmptyUnit(id: string) {
 }
 
 export async function updateUnit(id: string, patch: Partial<Unit>) { return db.update<Unit>('units', id, patch) }
+/** Cria uma pessoa sem fração (ex.: contacto de um anúncio com andar incerto). */
+export async function createPerson(p: { name: string; phone?: string; email?: string; traits?: string; notes?: string }) {
+  return (await db.insert<Person>('people', {
+    name: p.name.trim(), phone: p.phone?.trim() || null, email: p.email?.trim() || null,
+    traits: p.traits?.trim() || null, notes: p.notes?.trim() || null, pipedrive_person_id: null,
+  })).id
+}
+
 /** Liga uma pessoa a uma fração sem visita (ex.: dono de uma placa de venda). Cria a pessoa ou usa uma já existente. */
 export async function addPersonToUnit(unitId: string, p: { existingId?: string; name: string; role: Role; phone?: string; email?: string; traits?: string; notes?: string }) {
   let personId = p.existingId

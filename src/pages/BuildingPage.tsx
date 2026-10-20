@@ -223,6 +223,10 @@ function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClos
     body = <>
       <b>Anúncio · {fmtDate(l.first_seen, l.first_seen_uncertain)}</b>
       {rows.map(([k, val]) => <div className="row" key={k}><span className="sub">{k}</span><span>{val}</span></div>)}
+      {(() => { const c = l.contact_person_id ? f.people.find(p => p.id === l.contact_person_id) : null
+        return <div className="row"><span className="sub">Contacto</span>{c
+          ? <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><a href={`#/pessoa/${c.id}`}>{c.name}</a>{c.phone && <a className="chip ok" href={`tel:${c.phone}`} style={{ textDecoration: 'none' }}>Ligar {c.phone}</a>}</span>
+          : <span className="sub">— (Editar para escolher)</span>}</div> })()}
       <h2 style={{ marginTop: 12 }}>Preços</h2>
       {prices.map(p => <div className="row" key={p.id}><span className="sub">{fmtDate(p.at)}</span><span>{fmtPrice(p.price)}</span></div>)}
       {!prices.length && <div className="sub">Sem preço registado.</div>}

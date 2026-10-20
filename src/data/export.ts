@@ -66,9 +66,10 @@ export async function buildExports() {
     const ps = prices.filter(p => p.listing_id === l.id).sort((a, c) => a.at.localeCompare(c.at))
     return [b?.street, b?.number, l.unit_id ? uById.get(l.unit_id)?.label : l.floor_hint, l.operation, fmtDate(l.first_seen, l.first_seen_uncertain), l.typology, l.area_m2,
       l.advertiser_type === 'particular' ? 'Particular (FSBO)' : l.advertiser, l.exclusivity, lastPrice(l), ps.map(p => `${iso(p.at)}: ${p.price}`).join(' | '),
-      l.active ? 'Ativo' : 'Retirado', l.source, l.url, l.notes]
+      l.active ? 'Ativo' : 'Retirado', l.source, l.url, l.notes,
+      (() => { const c = l.contact_person_id ? pById.get(l.contact_person_id) : null; return c ? [c.name, c.phone, c.email].filter(Boolean).join(' · ') : '' })()]
   })
-  const anuncios = csv(['Rua', 'Nº', 'Fração / andar', 'Operação', 'Visto', 'Tipologia', 'Área m²', 'Anunciante', 'Exclusividade', 'Preço atual', 'Histórico de preços', 'Estado', 'Fonte', 'Link', 'Notas'], an)
+  const anuncios = csv(['Rua', 'Nº', 'Fração / andar', 'Operação', 'Visto', 'Tipologia', 'Área m²', 'Anunciante', 'Exclusividade', 'Preço atual', 'Histórico de preços', 'Estado', 'Fonte', 'Link', 'Notas', 'Contacto'], an)
 
   return { fracoes, visitas, anuncios, counts: { fracoes: fr.length, visitas: vi.length, anuncios: an.length } }
 }

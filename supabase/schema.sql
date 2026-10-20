@@ -126,6 +126,7 @@ create table if not exists listings (
   source text,                          -- radar, idealista, maxwork, legado…
   active boolean not null default true,
   notes text,
+  contact_person_id uuid references people(id) on delete set null,  -- quem atende o anúncio
   created_at timestamptz not null default now()
 );
 
