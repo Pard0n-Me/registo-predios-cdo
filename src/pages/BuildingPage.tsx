@@ -47,13 +47,19 @@ export default function BuildingPage({ id }: { id: string }) {
   const gridLabels = new Set(b.floors.flatMap(x => x.doors.map(d => unitLabel(x.label, d))))
   const extraUnits = f.units.filter(u => !gridLabels.has(u.label))
 
+  // Um anúncio de venda ativo manda sobre o estado guardado na fração (que pode estar desatualizado).
+  const effStatus = (u: Unit) => {
+    const l = f.listings.find(x => x.unit_id === u.id && x.active && x.operation === 'venda')
+    return l ? (l.advertiser_type === 'particular' ? 'fsbo' : 'fsba') : u.commercial_status
+  }
   const cellText = (u: Unit | undefined) => {
     if (!u) return '—'
-    if (u.commercial_status !== 'nada') return statusLabel(u.commercial_status)
-    const r = last.get(u.id)
-    if (!r) return u.typology ?? '—'
     const p = f.personUnits.find(pu => pu.unit_id === u.id)
     const person = p && f.people.find(x => x.id === p.person_id)
+    const st = effStatus(u)
+    if (st !== 'nada') return statusLabel(st) + (person ? ` · ${person.name}` : '')
+    const r = last.get(u.id)
+    if (!r) return person ? person.name : u.typology ?? '—'
     return r.outcomes.includes('falei') && person ? person.name : r.outcomes.map(outcomeLabel).join(' + ')
   }
 
@@ -88,7 +94,7 @@ export default function BuildingPage({ id }: { id: string }) {
                 <div className="units" style={{ gridTemplateColumns: `repeat(${fl.doors.length},1fr)` }}>
                   {fl.doors.map(d => {
                     const u = unitBy.get(unitLabel(fl.label, d))
-                    return <button key={d} className={'unit ' + cellClass(u?.commercial_status, u && last.get(u.id))} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
+                    return <button key={d} className={'unit ' + cellClass(u && effStatus(u), u && last.get(u.id))} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
                       <b>{d || fl.label}</b><span>{cellText(u)}</span></button>
                   })}
                 </div>

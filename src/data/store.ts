@@ -222,9 +222,14 @@ export async function saveListing(l: ListingInput): Promise<Listing> {
   const { id, price, price_at, ...data } = l
   const saved = id ? await db.update<Listing>('listings', id, data) : await db.insert<Listing>('listings', data)
   if (price) await db.insert('listing_prices', { listing_id: saved.id, at: price_at || saved.first_seen, price })
-  if (saved.unit_id && saved.active && !id) {
-    const status = saved.operation === 'venda' ? (saved.advertiser_type === 'particular' ? 'fsbo' : 'fsba') : null
-    if (status) await db.update('units', saved.unit_id, { commercial_status: status })
+  // O estado da fração acompanha o anúncio, também ao editar (ativar, retirar, mudar de anunciante)
+  if (saved.unit_id) {
+    const [u] = await db.where<Unit>('units', 'id', saved.unit_id)
+    const active = (await db.where<Listing>('listings', 'unit_id', saved.unit_id)).filter(x => x.active && x.operation === 'venda')
+    const want = active.length ? (active.some(x => x.advertiser_type === 'particular') ? 'fsbo' : 'fsba') : null
+    if (u && want && u.commercial_status !== want && (u.commercial_status === 'nada' || u.commercial_status === 'fsbo' || u.commercial_status === 'fsba'))
+      await db.update('units', u.id, { commercial_status: want })
+    if (u && !want && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
   }
   return saved
 }
