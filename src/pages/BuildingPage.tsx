@@ -95,7 +95,11 @@ export default function BuildingPage({ id }: { id: string }) {
               </div>
             ))}
           </div>
-          {!!extraUnits.length && <div className="chips" style={{ marginTop: 10 }}>{extraUnits.map(u => <button key={u.id} className="chip" onClick={() => go(`/p/${id}/f/${u.id}`)}>{u.label}</button>)}</div>}
+          {!!extraUnits.length && b.floors.length > 0 && <div style={{ marginTop: 12 }}>
+            <div className="sub">Fora da grelha (toca para juntar a uma fração ou apagar):</div>
+            <div className="chips" style={{ marginTop: 6 }}>{extraUnits.map(u => <button key={u.id} className="chip warn" onClick={() => go(`/p/${id}/f/${u.id}`)}>{u.label}</button>)}</div>
+          </div>}
+          {!!extraUnits.length && !b.floors.length && <div className="chips" style={{ marginTop: 10 }}>{extraUnits.map(u => <button key={u.id} className="chip" onClick={() => go(`/p/${id}/f/${u.id}`)}>{u.label}</button>)}</div>}
           <div className="legend" style={{ marginTop: 10 }}>
             <span><i className="dot" style={{ background: 'var(--ok)' }} />Falei</span>
             <span><i className="dot" style={{ background: 'var(--accent)' }} />Carta / postal</span>

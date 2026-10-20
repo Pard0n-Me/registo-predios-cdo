@@ -130,6 +130,48 @@ export async function deleteListing(l: Listing) {
   if (!others.length && u && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
 }
 
+/**
+ * Junta uma fração "fora da grelha" (ex.: "2.º", criada por um anúncio sem Esq/Dto) a uma fração da grelha:
+ * anúncios, resultados de visitas, pessoas, conversas e notas passam para a fração de destino; os dados
+ * da fração (tipologia, área, estado, notas…) só preenchem o que no destino estiver vazio. No fim apaga a fração de origem.
+ */
+export async function mergeUnit(fromId: string, toId: string) {
+  if (fromId === toId) return
+  const [[from], [to]] = await Promise.all([db.where<Unit>('units', 'id', fromId), db.where<Unit>('units', 'id', toId)])
+  if (!from || !to || from.building_id !== to.building_id) throw new Error('Frações não encontradas no mesmo prédio')
+  for (const l of await db.where<Listing>('listings', 'unit_id', fromId)) await db.update('listings', l.id, { unit_id: toId })
+  const toResults = await db.where<VisitResult>('visit_results', 'unit_id', toId)
+  for (const r of await db.where<VisitResult>('visit_results', 'unit_id', fromId)) {
+    const same = toResults.find(x => x.visit_id === r.visit_id)
+    if (same) {
+      await db.update('visit_results', same.id, { outcomes: [...new Set([...same.outcomes, ...r.outcomes])], note: [same.note, r.note].filter(Boolean).join(' · ') || null })
+      await db.remove('visit_results', r.id)
+    } else await db.update('visit_results', r.id, { unit_id: toId })
+  }
+  for (const pu of await db.where<PersonUnit>('person_units', 'unit_id', fromId)) {
+    await db.upsert('person_units', { person_id: pu.person_id, unit_id: toId, role: pu.role }, ['person_id', 'unit_id'])
+    await db.removeMatch('person_units', { person_id: pu.person_id, unit_id: fromId })
+  }
+  for (const i of await db.where<Interaction>('interactions', 'unit_id', fromId)) await db.update('interactions', i.id, { unit_id: toId })
+  for (const n of await db.where<UnitNote>('unit_notes', 'unit_id', fromId)) await db.update('unit_notes', n.id, { unit_id: toId })
+  const patch: Partial<Unit> = {}
+  if (!to.typology && from.typology) patch.typology = from.typology
+  if (to.area_m2 == null && from.area_m2 != null) patch.area_m2 = from.area_m2
+  if (to.condition === '?' && from.condition !== '?') patch.condition = from.condition
+  if (to.commercial_status === 'nada' && from.commercial_status !== 'nada') patch.commercial_status = from.commercial_status
+  if (to.pipedrive_deal_id == null && from.pipedrive_deal_id != null) patch.pipedrive_deal_id = from.pipedrive_deal_id
+  if (from.notes) patch.notes = [to.notes, from.notes].filter(Boolean).join('\n')
+  if (Object.keys(patch).length) await db.update('units', toId, patch)
+  await db.remove('units', fromId)
+}
+
+/** Apaga uma fração vazia (sem anúncios, visitas, pessoas nem notas). */
+export async function deleteEmptyUnit(id: string) {
+  const [ls, rs, pus, ns] = await Promise.all([db.where('listings', 'unit_id', id), db.where('visit_results', 'unit_id', id), db.where('person_units', 'unit_id', id), db.where('unit_notes', 'unit_id', id)])
+  if (ls.length || rs.length || pus.length || ns.length) throw new Error('A fração tem registos: junta-a a outra em vez de a apagar.')
+  await db.remove('units', id)
+}
+
 export async function updateUnit(id: string, patch: Partial<Unit>) { return db.update<Unit>('units', id, patch) }
 export async function updatePerson(id: string, patch: Partial<Person>) { return db.update<Person>('people', id, patch) }
 export async function addUnitNote(unitId: string, text: string, source: string | null) {

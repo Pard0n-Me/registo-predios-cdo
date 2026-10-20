@@ -13,6 +13,7 @@ export interface Adapter {
   update<T>(table: string, id: string, patch: Row): Promise<T>
   upsert(table: string, row: Row, keys: string[]): Promise<void>
   remove(table: string, id: string): Promise<void>
+  removeMatch(table: string, match: Row): Promise<void>
 }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -39,6 +40,7 @@ function supabaseAdapter(sb: SupabaseClient): Adapter {
       check(await sb.from(table).upsert(row, { onConflict: keys.join(',') }))
     },
     async remove(table: string, id: string) { check(await sb.from(table).delete().eq('id', id)) },
+    async removeMatch(table: string, match: Row) { check(await sb.from(table).delete().match(match)) },
   }
 }
 
@@ -78,6 +80,10 @@ function demoAdapter(): Adapter {
       db[table] = t(table).filter(x => x.id !== id)
       const c = child[table]; if (c) db[c[0]] = t(c[0]).filter(x => x[c[1]] !== id)
       for (const n of ['interactions', 'unit_notes']) if (table === 'visits') t(n).forEach(x => { if (x.visit_id === id) x.visit_id = null })
+      save()
+    },
+    async removeMatch(table: string, match: Row) {
+      db[table] = t(table).filter(x => !Object.entries(match).every(([k, v]) => x[k] === v))
       save()
     },
   }

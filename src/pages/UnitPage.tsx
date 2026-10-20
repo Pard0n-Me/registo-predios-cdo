@@ -2,7 +2,7 @@ import { flash } from '../components/Toast'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
-import { addUnitNote, getBuildingFull, updateUnit } from '../data/store'
+import { addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, unitLabel, updateUnit } from '../data/store'
 import type { BuildingFull, CommercialStatus, Cond, Unit } from '../types'
 import { COND, STATUS, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel } from '../ui'
 
@@ -12,6 +12,9 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const [dirty, setDirty] = useState(false)
   const [note, setNote] = useState('')
   const [err, setErr] = useState('')
+  const [target, setTarget] = useState('')
+  const [confirmMerge, setConfirmMerge] = useState(false)
+  const [busy, setBusy] = useState(false)
   const load = () => getBuildingFull(buildingId).then(x => { setF(x); setU(x.units.find(y => y.id === unitId) ?? null) }).catch(e => setErr(e.message))
   useEffect(() => { load() }, [buildingId, unitId]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!f || !u) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
@@ -29,11 +32,52 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const listings = f.listings.filter(l => l.unit_id === u.id)
   const history = f.visits.map(v => ({ v, r: f.results.find(r => r.visit_id === v.id && r.unit_id === u.id) })).filter(x => x.r)
   const notes = f.unitNotes.filter(n => n.unit_id === u.id).sort((a, b) => b.at.localeCompare(a.at))
+  const gridLabels = f.building.floors.flatMap(fl => fl.doors.map(d => unitLabel(fl.label, d)))
+  const outside = !gridLabels.includes(u.label)
+  const gridUnits = f.units.filter(x => x.id !== u.id && gridLabels.includes(x.label)).sort((a, b) => gridLabels.indexOf(a.label) - gridLabels.indexOf(b.label))
+  // sugere as frações do mesmo piso (ex.: "2.º" → "2.º Esq" e "2.º Dto")
+  const samefloor = gridUnits.filter(x => x.label.startsWith(u.label + ' '))
+  const isEmpty = !listings.length && !history.length && !people.length && !notes.length
+  const merge = async () => {
+    setBusy(true); setErr('')
+    try { await mergeUnit(u.id, target); flash('Frações juntas'); location.replace(`#/p/${buildingId}/f/${target}`) }
+    catch (e) { setErr((e as Error).message); setBusy(false) }
+  }
+  const removeEmpty = async () => {
+    setBusy(true); setErr('')
+    try { await deleteEmptyUnit(u.id); flash('Fração apagada'); location.replace(`#/p/${buildingId}`) }
+    catch (e) { setErr((e as Error).message); setBusy(false) }
+  }
 
   return (
     <>
       <header className="top"><button className="linkbtn" onClick={() => go(`/p/${buildingId}`)}>‹ Prédio</button><h1>{f.building.street.replace(/^Rua /, 'R. ')}, {f.building.number} · {u.label}</h1><Reload /></header>
       <main>
+        {outside && (
+          <div className="card" style={{ borderLeft: '4px solid var(--warn)' }}>
+            <b>Esta fração não está na grelha do prédio.</b>
+            <div className="sub" style={{ marginTop: 4 }}>
+              {isEmpty ? 'Não tem registos: podes apagá-la.' : 'Se for uma das frações da grelha (ex.: o 2.º de um anúncio que afinal é o 2.º Esq), junta-a: anúncios, visitas, pessoas e notas passam para lá.'}
+            </div>
+            {!!gridUnits.length && !isEmpty && <>
+              <label className="f" htmlFor="merge-target">Juntar a</label>
+              <select id="merge-target" className="t" value={target} onChange={e => { setTarget(e.target.value); setConfirmMerge(false) }}>
+                <option value="">Escolhe a fração…</option>
+                {samefloor.length > 0 && <optgroup label="Mesmo piso">{samefloor.map(x => <option key={x.id} value={x.id}>{x.label}</option>)}</optgroup>}
+                <optgroup label="Todas">{gridUnits.filter(x => !samefloor.includes(x)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)}</optgroup>
+              </select>
+              {target && !confirmMerge && <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={() => setConfirmMerge(true)}>Juntar ao {f.units.find(x => x.id === target)?.label}</button>}
+              {target && confirmMerge && <div className="note" style={{ marginTop: 10 }}>
+                <b>Juntar "{u.label}" ao {f.units.find(x => x.id === target)?.label}?</b> Tudo o que está aqui passa para lá e "{u.label}" desaparece.
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button className="btn sec" disabled={busy} onClick={() => setConfirmMerge(false)}>Cancelar</button>
+                  <button className="btn" disabled={busy} onClick={merge}>{busy ? 'A juntar…' : 'Juntar'}</button>
+                </div>
+              </div>}
+            </>}
+            {isEmpty && <button className="btn sec" style={{ width: '100%', marginTop: 10 }} disabled={busy} onClick={removeEmpty}>Apagar esta fração</button>}
+          </div>
+        )}
         <div className="card">
           <div className="two">
             <div><label className="f">Tipologia</label><input className="t" value={u.typology ?? ''} placeholder="T2" onChange={e => set('typology', e.target.value || null)} /></div>
