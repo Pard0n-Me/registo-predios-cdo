@@ -173,6 +173,20 @@ export async function deleteEmptyUnit(id: string) {
 }
 
 export async function updateUnit(id: string, patch: Partial<Unit>) { return db.update<Unit>('units', id, patch) }
+/** Liga uma pessoa a uma fração sem visita (ex.: dono de uma placa de venda). Cria a pessoa ou usa uma já existente. */
+export async function addPersonToUnit(unitId: string, p: { existingId?: string; name: string; role: Role; phone?: string; email?: string; traits?: string; notes?: string }) {
+  let personId = p.existingId
+  if (!personId) {
+    const created = await db.insert<Person>('people', {
+      name: p.name.trim(), phone: p.phone?.trim() || null, email: p.email?.trim() || null,
+      traits: p.traits?.trim() || null, notes: p.notes?.trim() || null, pipedrive_person_id: null,
+    })
+    personId = created.id
+  }
+  await db.upsert('person_units', { person_id: personId, unit_id: unitId, role: p.role }, ['person_id', 'unit_id'])
+  return personId
+}
+
 export async function updatePerson(id: string, patch: Partial<Person>) { return db.update<Person>('people', id, patch) }
 export async function addUnitNote(unitId: string, text: string, source: string | null) {
   return db.insert<UnitNote>('unit_notes', { unit_id: unitId, visit_id: null, source, text, at: new Date().toISOString() })

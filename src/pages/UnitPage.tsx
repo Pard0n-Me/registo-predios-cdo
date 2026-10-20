@@ -2,9 +2,9 @@ import { flash } from '../components/Toast'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
-import { addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, unitLabel, updateUnit } from '../data/store'
-import type { BuildingFull, CommercialStatus, Cond, Unit } from '../types'
-import { COND, STATUS, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel } from '../ui'
+import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, searchPeople, unitLabel, updateUnit } from '../data/store'
+import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '../types'
+import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel } from '../ui'
 
 export default function UnitPage({ buildingId, unitId }: { buildingId: string; unitId: string }) {
   const [f, setF] = useState<BuildingFull | null>(null)
@@ -15,6 +15,11 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const [target, setTarget] = useState('')
   const [confirmMerge, setConfirmMerge] = useState(false)
   const [busy, setBusy] = useState(false)
+  const EMPTY_P = { name: '', role: 'proprietario' as Role, phone: '', email: '', traits: '', notes: '' }
+  const [adding, setAdding] = useState(false)
+  const [np, setNp] = useState(EMPTY_P)
+  const [matches, setMatches] = useState<Person[]>([])
+  const setName = async (name: string) => { setNp(x => ({ ...x, name })); setMatches(name.trim().length >= 2 ? (await searchPeople(name)).slice(0, 3) : []) }
   const load = () => getBuildingFull(buildingId).then(x => { setF(x); setU(x.units.find(y => y.id === unitId) ?? null) }).catch(e => setErr(e.message))
   useEffect(() => { load() }, [buildingId, unitId]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!f || !u) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
@@ -95,7 +100,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
 
         <div className="card">
           <h2>Pessoas</h2>
-          {!people.length && <div className="sub">Ninguém registado.</div>}
+          {!people.length && !adding && <div className="sub">Ninguém registado.</div>}
           {people.map(({ pu, p }) => (
             <div key={p!.id} className="row click" onClick={() => go(`/pessoa/${p!.id}`)}>
               <div><b>{p!.name}</b> <span className="sub">· {roleLabel(pu.role)}</span>
@@ -103,6 +108,34 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
               {p!.phone ? <a className="iconbtn" aria-label={`Ligar a ${p!.name}`} href={`tel:${p!.phone}`} onClick={e => e.stopPropagation()}><Icon name="phone" /></a> : '›'}
             </div>
           ))}
+          {!adding && <button className="linkbtn" style={{ marginTop: 8 }} onClick={() => { setAdding(true); setNp(EMPTY_P); setMatches([]) }}>+ Pessoa</button>}
+          {adding && <div style={{ marginTop: 8 }}>
+            <div className="sub">Sem visita: para quem conheces por outra via (placa de venda, anúncio, vizinho). Se falaste à porta, regista antes uma visita.</div>
+            <label className="f" htmlFor="np-name">Nome</label>
+            <input id="np-name" className="t" value={np.name} onChange={e => setName(e.target.value)} placeholder="Nome (ou descrição, ex.: dono da loja)" autoComplete="off" />
+            {matches.filter(m => !people.some(x => x.p!.id === m.id)).map(m => (
+              <div key={m.id} className="row" style={{ padding: '8px 0' }}>
+                <div><b>{m.name}</b><div className="sub">{[m.phone, m.traits].filter(Boolean).join(' · ') || 'já registada'}</div></div>
+                <button className="btn sec small" disabled={busy} onClick={async () => { setBusy(true); try { await addPersonToUnit(u.id, { existingId: m.id, name: m.name, role: np.role }); flash('Pessoa ligada'); setAdding(false); load() } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>Ligar esta</button>
+              </div>
+            ))}
+            <label className="f" htmlFor="np-role">Papel</label>
+            <select id="np-role" className="t" value={np.role} onChange={e => setNp({ ...np, role: e.target.value as Role })}>{ROLES.map(([r, l]) => <option key={r} value={r}>{l}</option>)}</select>
+            <div className="two">
+              <div><label className="f" htmlFor="np-phone">Telefone</label><input id="np-phone" className="t" type="tel" value={np.phone} onChange={e => setNp({ ...np, phone: e.target.value })} /></div>
+              <div><label className="f" htmlFor="np-email">Email</label><input id="np-email" className="t" type="email" value={np.email} onChange={e => setNp({ ...np, email: e.target.value })} /></div>
+            </div>
+            <label className="f" htmlFor="np-traits">Traços para reconhecer</label><input id="np-traits" className="t" value={np.traits} onChange={e => setNp({ ...np, traits: e.target.value })} />
+            <label className="f" htmlFor="np-notes">Notas (de onde vem o contacto)</label><textarea id="np-notes" className="t" value={np.notes} onChange={e => setNp({ ...np, notes: e.target.value })} placeholder="ex.: placa de venda na montra, 20/10; 2.º número do Idealista" />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="btn sec" disabled={busy} onClick={() => setAdding(false)}>Cancelar</button>
+              <button className="btn" disabled={busy || !np.name.trim()} onClick={async () => {
+                setBusy(true)
+                try { await addPersonToUnit(u.id, np); flash('Pessoa acrescentada'); setAdding(false); load() }
+                catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+              }}>{busy ? 'A gravar…' : 'Gravar pessoa'}</button>
+            </div>
+          </div>}
         </div>
 
         <div className="card">
