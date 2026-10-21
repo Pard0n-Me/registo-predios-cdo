@@ -43,12 +43,12 @@ export default function PiecesPage() {
 
 function Row({ p, onEdit, extra }: { p: Piece; onEdit: () => void; extra: React.ReactNode }) {
   return (
-    <div className="row" style={{ gap: 10 }}>
-      <button className="linkbtn" style={{ display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', flex: 1, minWidth: 0 }} onClick={onEdit}>
+    <div className="row" style={{ display: 'block' }}>
+      <button className="linkbtn" style={{ display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', width: '100%' }} onClick={onEdit}>
         {p.thumb ? <img className="pthumb" src={p.thumb} alt="" /> : <span className="pthumb" />}
         <span style={{ minWidth: 0 }}><b style={{ color: 'var(--ink)' }}>{p.short_name}</b><div className="sub">{p.name}</div></span>
       </button>
-      <div style={{ display: 'flex', gap: 4, flex: 'none' }}>{extra}</div>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>{extra}</div>
     </div>
   )
 }
