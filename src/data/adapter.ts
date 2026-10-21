@@ -55,6 +55,11 @@ function demoAdapter(): Adapter {
   const save = () => { try { localStorage.setItem(DEMO_KEY, JSON.stringify(db)) } catch { /* sem armazenamento */ } }
   const t = (name: string) => (db[name] ??= [])
   const clone = <T>(x: unknown) => structuredClone(x) as T
+  // imita a regra da base: um só prédio por rua e número
+  const uniqueAddress = (table: string, row: Row, id?: unknown) => {
+    if (table === 'buildings' && t(table).some(x => x.id !== id && x.street === (row.street ?? t(table).find(y => y.id === id)?.street) && x.number === (row.number ?? t(table).find(y => y.id === id)?.number)))
+      throw new Error('duplicate key value violates unique constraint "buildings_street_number_key"')
+  }
   return {
     demo: true,
     async all<T>(table: string) { return clone<T[]>(t(table)) },
@@ -62,11 +67,13 @@ function demoAdapter(): Adapter {
     async whereIn<T>(table: string, col: string, values: unknown[]) { return clone<T[]>(t(table).filter(r => values.includes(r[col]))) },
     async insert<T>(table: string, row: Row) {
       const r = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...row }
+      uniqueAddress(table, r, r.id)
       t(table).push(r); save(); return clone<T>(r)
     },
     async update<T>(table: string, id: string, patch: Row) {
       const r = t(table).find(x => x.id === id)
       if (!r) throw new Error('Registo não encontrado')
+      uniqueAddress(table, patch, id)
       Object.assign(r, patch, { updated_at: new Date().toISOString() }); save(); return clone<T>(r)
     },
     async upsert(table: string, row: Row, keys: string[]) {

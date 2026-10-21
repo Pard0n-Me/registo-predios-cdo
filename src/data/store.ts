@@ -64,6 +64,11 @@ export async function saveBuilding(b: Partial<Building> & { street: string; numb
   return saved
 }
 
+/** Prédio com exatamente esta rua e número (a base não deixa haver dois). */
+export async function findBuildingByAddress(street: string, number: string): Promise<Building | undefined> {
+  return (await db.where<Building>('buildings', 'number', number)).find(x => x.street === street)
+}
+
 export async function setBuildingPosition(id: string, lat: number, lng: number) {
   return db.update<Building>('buildings', id, { lat, lng })
 }

@@ -2,7 +2,7 @@ import { flash } from '../components/Toast'
 import Icon from '../components/Icon'
 import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
-import { geocode, getBuildingFull, saveBuilding } from '../data/store'
+import { findBuildingByAddress, geocode, getBuildingFull, saveBuilding } from '../data/store'
 import type { Building, Cond, Floor, Tri } from '../types'
 import { COND, TRI } from '../ui'
 
@@ -62,8 +62,9 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
     else setErr('Não encontrei a morada no mapa. Toca no mapa para marcar o prédio.')
   }
 
+  const [dup, setDup] = useState<string | null>(null)
   const submit = async () => {
-    setErr('')
+    setErr(''); setDup(null)
     if (!b.street?.trim() || !b.number?.trim()) { setErr('Rua e número são obrigatórios.'); return }
     setBusy(true)
     try {
@@ -74,7 +75,10 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
       location.replace(`#/p/${saved.id}`)
     } catch (e) {
       const m = (e as Error).message
-      setErr(/duplicate|unique/i.test(m) ? 'Já existe um prédio com esta morada.' : m)
+      if (/duplicate|unique/i.test(m)) {
+        setErr('Já existe um prédio com esta morada.')
+        setDup((await findBuildingByAddress(b.street.trim(), b.number.trim()).catch(() => undefined))?.id ?? null)
+      } else setErr(m)
     } finally { setBusy(false) }
   }
 
@@ -156,7 +160,10 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
           <label className="f">Notas do prédio</label>
           <textarea className="t" value={b.notes ?? ''} onChange={e => set('notes', e.target.value || null)} />
         </div>
-        {err && <div className="err">{err}</div>}
+        {err && <div className="err">{err}{dup && <>
+          {id && <div style={{ marginTop: 4 }}>Se for o mesmo prédio repetido, pede ao Claude para juntar os dois.</div>}
+          <button className="btn sec small" style={{ marginTop: 8 }} onClick={() => location.replace(`#/p/${dup}`)}>Abrir o prédio existente</button>
+        </>}</div>}
       </main>
       <div className="fab"><button className="btn" disabled={busy} onClick={submit}>{busy ? 'A gravar…' : 'Gravar prédio'}</button></div>
     </>
