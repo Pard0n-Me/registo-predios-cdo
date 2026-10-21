@@ -1,0 +1,56 @@
+[
+ {
+  "name": "Carta de apresentação CdO 2022",
+  "short_name": "Carta",
+  "file": "carta.jpg",
+  "sort": 1
+ },
+ {
+  "name": "Postal Posicionamento 2024 (+85 transações)",
+  "short_name": "Postal",
+  "file": "postal.jpg",
+  "sort": 2
+ },
+ {
+  "name": "Bloco \"De vizinho para vizinho\" (com a Rita, 2025)",
+  "short_name": "Bloco Rita",
+  "file": "bloco-rita.jpg",
+  "sort": 3
+ },
+ {
+  "name": "Bloco 2017",
+  "short_name": "Bloco 2017",
+  "file": "bloco-2017.jpg",
+  "sort": 4
+ },
+ {
+  "name": "Flyer Mapa CdO (negócios fechados)",
+  "short_name": "Flyer Mapa",
+  "file": "flyer-mapa.jpg",
+  "sort": 5
+ },
+ {
+  "name": "Flyer \"+1 negócio fechado\" (S. João Nepomuceno 2)",
+  "short_name": "Flyer Vendido",
+  "file": "flyer-vendido.jpg",
+  "sort": 6
+ },
+ {
+  "name": "Cartão de visita Meridian 2026",
+  "short_name": "Cartão Meridian",
+  "file": "cartao-meridian.jpg",
+  "sort": 7
+ },
+ {
+  "name": "Cartão de visita RE/MAX MVP 2022",
+  "short_name": "Cartão MVP",
+  "file": "cartao-mvp.jpg",
+  "sort": 8
+ },
+ {
+  "name": "Tríptico 2018 (\"Está a pensar vender?\")",
+  "short_name": "Tríptico",
+  "file": "triptico.jpg",
+  "sort": 9
+ }
+]
