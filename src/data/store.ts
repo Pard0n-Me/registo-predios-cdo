@@ -1,6 +1,6 @@
 import { db } from './adapter'
 import type {
-  Building, BuildingFull, BuildingSummary, Floor, Interaction, Listing, ListingPrice, Outcome,
+  Building, BuildingFull, BuildingSummary, Delivery, Floor, Interaction, Listing, ListingPrice, Outcome,
   Person, PersonUnit, Role, Unit, UnitNote, Visit, VisitResult,
 } from '../types'
 import { condLabel } from '../ui'
@@ -85,6 +85,8 @@ export interface PersonInput {
 export interface ResultInput {
   unitId: string
   outcomes: Outcome[]
+  /** Peças deixadas (peça + canal). */
+  deliveries?: Delivery[]
   note: string
   person?: PersonInput
   otherUnitNote?: { unitId: string; text: string }
@@ -110,9 +112,12 @@ export async function saveVisit(v: VisitInput): Promise<Visit> {
     : [[], []]
   for (const r of v.results) {
     const old = oldResults.find(x => x.unit_id === r.unitId)
-    if (!r.outcomes.length && !r.note) { if (old) await db.remove('visit_results', old.id); continue }
-    if (old) await db.update('visit_results', old.id, { outcomes: r.outcomes, note: r.note || null })
-    else await db.insert('visit_results', { visit_id: visit.id, unit_id: r.unitId, outcomes: r.outcomes, note: r.note || null })
+    const dl = r.deliveries ?? []
+    if (!r.outcomes.length && !r.note && !dl.length) { if (old) await db.remove('visit_results', old.id); continue }
+    // as entregas só vão quando há (a coluna é de 21/10)
+    const fields = { outcomes: r.outcomes, note: r.note || null, ...(dl.length || old?.deliveries?.length ? { deliveries: dl } : {}) }
+    if (old) await db.update('visit_results', old.id, fields)
+    else await db.insert('visit_results', { visit_id: visit.id, unit_id: r.unitId, ...fields })
     let source: string | null = null
     if (r.person && r.person.name.trim()) {
       const p = r.person
@@ -167,7 +172,10 @@ export async function mergeUnit(fromId: string, toId: string) {
   for (const r of await db.where<VisitResult>('visit_results', 'unit_id', fromId)) {
     const same = toResults.find(x => x.visit_id === r.visit_id)
     if (same) {
-      await db.update('visit_results', same.id, { outcomes: [...new Set([...same.outcomes, ...r.outcomes])], note: [same.note, r.note].filter(Boolean).join(' · ') || null })
+      await db.update('visit_results', same.id, {
+        outcomes: [...new Set([...same.outcomes, ...r.outcomes])], note: [same.note, r.note].filter(Boolean).join(' · ') || null,
+        ...(r.deliveries?.length ? { deliveries: [...(same.deliveries ?? []), ...r.deliveries] } : {}),
+      })
       await db.remove('visit_results', r.id)
     } else await db.update('visit_results', r.id, { unit_id: toId })
   }

@@ -4,9 +4,11 @@ import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, searchPeople, unitLabel, updateUnit } from '../data/store'
 import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '../types'
-import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel } from '../ui'
+import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel } from '../ui'
+import { usePieces } from '../data/pieces'
 
 export default function UnitPage({ buildingId, unitId }: { buildingId: string; unitId: string }) {
+  const pieces = usePieces()
   const [f, setF] = useState<BuildingFull | null>(null)
   const [u, setU] = useState<Unit | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -161,7 +163,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           {!history.length && <div className="sub">Sem visitas a esta fração.</div>}
           {history.map(({ v, r }) => <div key={v.id} className="row" style={{ display: 'block' }}>
             <span className="sub">{v.year_uncertain ? fmtDate(v.visited_at, true) : fmtDateTime(v.visited_at)}{v.companion ? ` · com ${v.companion}` : ''}</span>
-            <div>{r!.outcomes.map(outcomeLabel).join(' + ')}{r!.note ? ` · ${r!.note}` : ''}</div>
+            <div>{resultText(r!, pieces)}{r!.note ? ` · ${r!.note}` : ''}</div>
             {f.interactions.filter(i => i.visit_id === v.id && i.unit_id === u.id).map(i => <div key={i.id} className="sub"><Icon name="user" size={13} /> {f.people.find(p => p.id === i.person_id)?.name}: {i.notes ?? '—'}</div>)}
           </div>)}
         </div>

@@ -1,7 +1,8 @@
 // Exportação para Excel: CSV com ";" e BOM (abre direito no Excel em português).
 import { db } from './adapter'
 import type { Building, Interaction, Listing, ListingPrice, Person, PersonUnit, Unit, Visit, VisitResult } from '../types'
-import { condLabel, fmtDate, outcomeLabel, roleLabel, statusLabel } from '../ui'
+import { condLabel, fmtDate, resultText, roleLabel, statusLabel } from '../ui'
+import { getPieces } from './pieces'
 
 const cell = (v: unknown) => {
   const s = v == null ? '' : String(v)
@@ -17,6 +18,7 @@ export async function buildExports() {
     db.all<Person>('people'), db.all<PersonUnit>('person_units'), db.all<Interaction>('interactions'),
     db.all<Listing>('listings'), db.all<ListingPrice>('listing_prices'),
   ])
+  const pieces = await getPieces(true)
   const bById = new Map(buildings.map(b => [b.id, b]))
   const uById = new Map(units.map(u => [u.id, u]))
   const vById = new Map(visits.map(v => [v.id, v]))
@@ -28,7 +30,7 @@ export async function buildExports() {
   const fr: unknown[][] = []
   for (const b of [...buildings].sort(byStreet)) {
     const base = [b.street, b.number, b.origin, b.construction === 'betao' ? 'Betão' : b.construction, tri(b.elevator), tri(b.garage), tri(b.storage),
-      b.ground_commerce === 'sim' ? b.commerce_desc || 'Sim' : tri(b.ground_commerce), tri(b.porter), b.mailbox, tri(b.horizontal_property),
+      b.ground_commerce === 'sim' ? b.commerce_desc || 'Sim' : tri(b.ground_commerce), tri(b.porter), b.mailbox, tri(b.no_ads ?? '?'), tri(b.horizontal_property),
       b.orientation, condLabel(b.cond_ext), condLabel(b.cond_int), b.condo_admin, b.notes, b.lat, b.lng]
     const us = units.filter(u => u.building_id === b.id).sort((a, c) => a.label.localeCompare(c.label, 'pt', { numeric: true }))
     if (!us.length) { fr.push([...base, '', '', '', '', '', '', '', '', '', '']); continue }
@@ -38,10 +40,10 @@ export async function buildExports() {
       const ppl = personUnits.filter(pu => pu.unit_id === u.id).map(pu => { const p = pById.get(pu.person_id); return p ? [p.name, roleLabel(pu.role), p.phone, p.email].filter(Boolean).join(' · ') : '' }).filter(Boolean).join(' | ')
       const ls = listings.filter(l => l.unit_id === u.id && l.active).map(l => `${l.operation} ${lastPrice(l)} € (${l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser ?? '?'})`).join(' | ')
       fr.push([...base, u.label, u.typology, u.area_m2, condLabel(u.condition), statusLabel(u.commercial_status),
-        last?.v ? iso(last.v.visited_at) : '', last ? last.r.outcomes.map(outcomeLabel).join(' + ') : '', ppl, ls, u.notes])
+        last?.v ? iso(last.v.visited_at) : '', last ? resultText(last.r, pieces) : '', ppl, ls, u.notes])
     }
   }
-  const fracoes = csv(['Rua', 'Nº', 'Origem', 'Construção', 'Elevador', 'Garagens', 'Arrecadações', 'Comércio RC', 'Porteira', 'Caixas do correio', 'PH',
+  const fracoes = csv(['Rua', 'Nº', 'Origem', 'Construção', 'Elevador', 'Garagens', 'Arrecadações', 'Comércio RC', 'Porteira', 'Caixas do correio', 'Publicidade não', 'PH',
     'Orientação', 'Conservação exterior', 'Conservação interior', 'Administração', 'Notas do prédio', 'Latitude', 'Longitude',
     'Fração', 'Tipologia', 'Área m²', 'Conservação', 'Estado comercial', 'Última visita', 'Último resultado', 'Pessoas', 'Anúncios ativos', 'Notas da fração'], fr)
 
@@ -54,7 +56,7 @@ export async function buildExports() {
     if (!rs.length) { vi.push([...head, '', '', '', '', '', v.general_note, v.origin]); continue }
     for (const r of rs) {
       const ints = interactions.filter(i => i.visit_id === v.id && i.unit_id === r.unit_id)
-      vi.push([...head, uById.get(r.unit_id)?.label, r.outcomes.map(outcomeLabel).join(' + '), r.note,
+      vi.push([...head, uById.get(r.unit_id)?.label, resultText(r, pieces), r.note,
         ints.map(i => pById.get(i.person_id)?.name).filter(Boolean).join(' | '), ints.map(i => i.notes).filter(Boolean).join(' | '), v.general_note, v.origin])
     }
   }

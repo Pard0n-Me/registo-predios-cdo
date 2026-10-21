@@ -27,6 +27,8 @@ export interface Building {
   condo_admin: string | null
   notes: string | null
   origin: 'novo' | 'legado'
+  /** Autocolante "publicidade não" (coluna de 21/10). */
+  no_ads?: Tri
   created_at?: string
   updated_at?: string
 }
@@ -60,11 +62,28 @@ export type Outcome =
   | 'nao_abriu' | 'caixa_cheia' | 'carta_mao' | 'carta_correio' | 'carta_porta'
   | 'postal' | 'bloco' | 'recusou' | 'falei'
 
+/** Canal de entrega de uma peça de marketing. */
+export type Channel = 'porta' | 'caixa' | 'mao' | '?'
+/** Uma peça deixada numa porta: peça + canal, um só evento. */
+export interface Delivery { piece: string; channel: Channel }
+
+export interface Piece {
+  id: string
+  name: string
+  short_name: string
+  thumb: string | null
+  active: boolean
+  sort: number
+}
+
 export interface VisitResult {
   id: string
   visit_id: string
   unit_id: string
+  /** Resultado (falei, recusou, nao_abriu, caixa_cheia). Os antigos carta/postal/bloco passaram a entregas a 21/10. */
   outcomes: Outcome[]
+  /** Coluna de 21/10: pode faltar em dados lidos antes da migração. */
+  deliveries?: Delivery[]
   note: string | null
 }
 

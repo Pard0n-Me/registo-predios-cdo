@@ -10,6 +10,7 @@ import UnitPage from './pages/UnitPage'
 import PersonPage from './pages/PersonPage'
 import ListingForm from './pages/ListingForm'
 import Login from './pages/Login'
+import PiecesPage from './pages/PiecesPage'
 
 function useHash() {
   const [h, setH] = useState(location.hash.slice(1) || '/')
@@ -26,6 +27,7 @@ function route(hash: string) {
   const q = new URLSearchParams(qs)
   const p = path.split('/').filter(Boolean).map(decodeURIComponent)
   if (p[0] === 'novo') return <BuildingForm initial={{ street: q.get('street') ?? '', number: q.get('number') ?? '' }} />
+  if (p[0] === 'pecas') return <PiecesPage />
   if (p[0] === 'pessoa' && p[1]) return <PersonPage key={p[1]} id={p[1]} />
   if (p[0] === 'p' && p[1]) {
     const id = p[1]

@@ -9,7 +9,7 @@ import { COND, TRI } from '../ui'
 const EMPTY: Omit<Building, 'id'> = {
   street: '', number: '', corner_note: null, lat: null, lng: null, floors: [],
   construction: '?', elevator: '?', garage: '?', storage: '?', storage_note: null, ground_commerce: '?', commerce_desc: null,
-  porter: '?', mailbox: '?', horizontal_property: '?', orientation: '?', cond_ext: '?', cond_int: '?', condo_admin: null, notes: null, origin: 'novo',
+  porter: '?', no_ads: '?', mailbox: '?', horizontal_property: '?', orientation: '?', cond_ext: '?', cond_int: '?', condo_admin: null, notes: null, origin: 'novo',
 }
 
 const PATTERNS: [string, string[]][] = [
@@ -149,6 +149,7 @@ export default function BuildingForm({ id, initial }: { id?: string; initial?: {
           {tri('porter', 'Porteira residente')}
           <label className="f">Caixas de correio</label>
           <Seg value={b.mailbox ?? '?'} options={[['exterior', 'Exterior'], ['interior', 'Interior'], ['?', '?']]} onChange={v => set('mailbox', v)} />
+          {tri('no_ads', 'Autocolante "publicidade não"')}
           {tri('horizontal_property', 'Propriedade horizontal')}
           <label className="f">Conservação exterior</label><Seg<Cond> value={b.cond_ext ?? '?'} options={COND} onChange={v => set('cond_ext', v)} />
           <label className="f">Conservação interior (zonas comuns)</label><Seg<Cond> value={b.cond_int ?? '?'} options={COND} onChange={v => set('cond_int', v)} />

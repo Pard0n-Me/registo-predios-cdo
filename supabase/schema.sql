@@ -28,6 +28,7 @@ create table if not exists buildings (
   cond_int text not null default '?' check (cond_int in ('bom','razoavel','mau','obras','?')),
   condo_admin text,
   notes text,
+  no_ads text not null default '?' check (no_ads in ('sim','nao','?')),  -- autocolante "publicidade não"
   origin text not null default 'novo' check (origin in ('novo','legado')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -65,7 +66,8 @@ create table if not exists visit_results (
   id uuid primary key default gen_random_uuid(),
   visit_id uuid not null references visits(id) on delete cascade,
   unit_id uuid not null references units(id) on delete cascade,
-  outcomes text[] not null default '{}',  -- nao_abriu, caixa_cheia, carta_mao, carta_correio, carta_porta, postal, bloco, recusou, falei
+  outcomes text[] not null default '{}',  -- resultado: falei, recusou, nao_abriu, caixa_cheia (antigos convertidos em entregas a 21/10)
+  deliveries jsonb not null default '[]'::jsonb,  -- entregas: [{"piece": id, "channel": porta|caixa|mao|?}]
   note text,
   unique (visit_id, unit_id)
 );
@@ -148,11 +150,22 @@ begin new.updated_at = now(); return new; end $$;
 drop trigger if exists buildings_touch on buildings;
 create trigger buildings_touch before update on buildings for each row execute function touch_updated_at();
 
+-- Peças de marketing (o António gere na app; arquivar = active false)
+create table if not exists marketing_pieces (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  short_name text not null,
+  thumb text,
+  active boolean not null default true,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- Segurança: só utilizadores autenticados (só o António; registos novos desligados no painel)
 do $$
 declare t text;
 begin
-  foreach t in array array['buildings','units','visits','visit_results','people','person_units','interactions','unit_notes','listings','listing_prices']
+  foreach t in array array['buildings','units','visits','visit_results','people','person_units','interactions','unit_notes','listings','listing_prices','marketing_pieces']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists "so autenticado" on %I', t);

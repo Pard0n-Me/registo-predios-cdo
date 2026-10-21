@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
 import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
-import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, outcomeLabel, roleLabel, statusLabel } from '../ui'
+import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel, statusLabel } from '../ui'
+import { usePieces } from '../data/pieces'
+import type { Piece } from '../types'
 
 function chips(b: Building): [string, string][] {
   const t = (v: string, yes: string, no: string, q: string): [string, string] =>
@@ -17,6 +19,7 @@ function chips(b: Building): [string, string][] {
     t(b.storage, 'Arrecadações' + (b.storage_note ? ` (${b.storage_note})` : ''), 'Sem arrecadações', 'Arrecadações ?'),
     b.ground_commerce === 'sim' ? [`RC: ${b.commerce_desc || 'comércio'}`, 'acc'] : b.ground_commerce === 'nao' ? ['RC: habitação', ''] : ['Comércio RC ?', 'q'],
     t(b.porter, 'Porteira residente', 'Sem porteira', 'Porteira ?'),
+    ...(b.no_ads === 'sim' ? [['Publicidade não', 'warn'] as [string, string]] : []),
     b.mailbox === '?' ? ['Caixas ?', 'q'] : [`Caixas no ${b.mailbox}`, ''],
     t(b.horizontal_property, 'PH', 'Sem PH (prédio inteiro)', 'PH ?'),
     b.cond_ext === '?' ? ['Exterior ?', 'q'] : [`Exterior: ${condLabel(b.cond_ext).toLowerCase()}`, b.cond_ext === 'bom' ? 'ok' : b.cond_ext === 'mau' ? 'bad' : 'warn'],
@@ -29,6 +32,7 @@ function chips(b: Building): [string, string][] {
 type Ev = { kind: 'visit'; at: string; v: Visit } | { kind: 'listing'; at: string; l: Listing }
 
 export default function BuildingPage({ id }: { id: string }) {
+  const pieces = usePieces()
   const [f, setF] = useState<BuildingFull | null>(null)
   const [err, setErr] = useState('')
   const [open, setOpen] = useState<Ev | null>(null)
@@ -60,7 +64,7 @@ export default function BuildingPage({ id }: { id: string }) {
     if (st !== 'nada') return statusLabel(st) + (person ? ` · ${person.name}` : '')
     const r = last.get(u.id)
     if (!r) return person ? person.name : u.typology ?? '—'
-    return r.outcomes.includes('falei') && person ? person.name : r.outcomes.map(outcomeLabel).join(' + ')
+    return r.outcomes.includes('falei') && person ? person.name : resultText(r, pieces)
   }
 
   const events: Ev[] = [
@@ -108,7 +112,7 @@ export default function BuildingPage({ id }: { id: string }) {
           {!!extraUnits.length && !b.floors.length && <div className="chips" style={{ marginTop: 10 }}>{extraUnits.map(u => <button key={u.id} className="chip" onClick={() => go(`/p/${id}/f/${u.id}`)}>{u.label}</button>)}</div>}
           <div className="legend" style={{ marginTop: 10 }}>
             <span><i className="dot" style={{ background: 'var(--ok)' }} />Falei</span>
-            <span><i className="dot" style={{ background: 'var(--accent)' }} />Carta / postal</span>
+            <span><i className="dot" style={{ background: 'var(--accent)' }} />Entrega / outro</span>
             <span><i className="dot" style={{ background: 'var(--warn)' }} />Caixa cheia</span>
             <span><i className="dot" style={{ background: 'var(--bad)' }} />À venda</span>
           </div>
@@ -153,7 +157,7 @@ export default function BuildingPage({ id }: { id: string }) {
         <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
         <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
       </div>
-      {open && <Detail ev={open} f={f} onClose={() => setOpen(null)} onDeleted={() => { flash(open.kind === 'visit' ? 'Visita apagada' : 'Anúncio apagado'); setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
+      {open && <Detail ev={open} f={f} pieces={pieces} onClose={() => setOpen(null)} onDeleted={() => { flash(open.kind === 'visit' ? 'Visita apagada' : 'Anúncio apagado'); setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
     </>
   )
 }
@@ -172,7 +176,7 @@ function listingLine(l: Listing, f: BuildingFull) {
   return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · retirado</span>}</>
 }
 
-function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClose: () => void; onDeleted: () => void }) {
+function Detail({ ev, f, pieces, onClose, onDeleted }: { ev: Ev; f: BuildingFull; pieces: Piece[]; onClose: () => void; onDeleted: () => void }) {
   const bid = f.building.id
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -201,7 +205,7 @@ function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClos
       {rs.map(({ r, u }) => {
         const ints = f.interactions.filter(i => i.visit_id === v.id && i.unit_id === r.unit_id)
         return <div key={r.id} className="row" style={{ display: 'block' }}>
-          <a href={`#/p/${bid}/f/${r.unit_id}`}><b>{u?.label}</b></a> <span className="sub">· {r.outcomes.map(outcomeLabel).join(' + ')}</span>
+          <a href={`#/p/${bid}/f/${r.unit_id}`}><b>{u?.label}</b></a> <span className="sub">· {resultText(r, pieces)}</span>
           {r.note && <div className="sub">{r.note}</div>}
           {ints.map(i => {
             const p = f.people.find(x => x.id === i.person_id)

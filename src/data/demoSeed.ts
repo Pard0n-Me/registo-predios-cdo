@@ -40,6 +40,20 @@ export function demoSeed(): Record<string, Row[]> {
     r(v1, u(b1, '1.º Esq'), ['nao_abriu', 'postal']), r(v1, u(b1, '1.º Dto'), ['nao_abriu', 'postal']),
     r(v1, u(b1, 'RC Esq'), ['falei', 'bloco']), r(v1, u(b1, 'RC Dto'), ['caixa_cheia']),
   ]
+  // Peças de marketing fictícias (miniaturas = quadrados de cor) e entregas no formato novo (peça + canal)
+  const thumb = (c: string, t: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${c}"/><text x="40" y="48" font-size="20" fill="#fff" text-anchor="middle" font-family="sans-serif">${t}</text></svg>`)}`
+  const marketing_pieces: Row[] = [
+    { id: 'demo-pc-postal', name: 'Postal (exemplo)', short_name: 'Postal', thumb: thumb('#0f5c8c', 'P'), active: true, sort: 1 },
+    { id: 'demo-pc-bloco', name: 'Bloco (exemplo)', short_name: 'Bloco', thumb: thumb('#a63a32', 'B'), active: true, sort: 2 },
+    { id: 'demo-pc-flyer', name: 'Flyer (exemplo)', short_name: 'Flyer', thumb: thumb('#2f7d4f', 'F'), active: true, sort: 3 },
+    { id: 'demo-pc-carta', name: 'Carta (exemplo)', short_name: 'Carta', thumb: null, active: true, sort: 4 },
+  ]
+  const asDelivery: Record<string, [string, string]> = { postal: ['demo-pc-postal', 'caixa'], bloco: ['demo-pc-bloco', 'porta'] }
+  for (const x of results) {
+    const o = x.outcomes as string[]
+    x.deliveries = o.filter(k => asDelivery[k]).map(k => ({ piece: asDelivery[k][0], channel: asDelivery[k][1] }))
+    x.outcomes = o.filter(k => !asDelivery[k])
+  }
   const p1 = 'demo-p1', p2 = 'demo-p2'
   const people: Row[] = [
     { id: p1, name: 'Marta (exemplo)', phone: null, email: null, traits: 'Cabelo curto, simpática', notes: null, pipedrive_person_id: null },
@@ -63,5 +77,5 @@ export function demoSeed(): Record<string, Row[]> {
       source: 'radar', active: true, notes: null },
   ]
   const listing_prices: Row[] = [{ id: crypto.randomUUID(), listing_id: l1, at: '2025-10-20', price: 365000 }]
-  return { buildings, units, visits, visit_results: results, people, person_units, interactions, unit_notes, listings, listing_prices }
+  return { buildings, units, visits, visit_results: results, marketing_pieces, people, person_units, interactions, unit_notes, listings, listing_prices }
 }

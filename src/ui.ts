@@ -1,4 +1,4 @@
-import type { CommercialStatus, Cond, Outcome, Role, Tri, VisitResult } from './types'
+import type { Channel, CommercialStatus, Cond, Delivery, Outcome, Piece, Role, Tri, VisitResult } from './types'
 
 export const OUTCOMES: [Outcome, string][] = [
   ['nao_abriu', 'Não abriu'], ['caixa_cheia', 'Caixa cheia'], ['carta_mao', 'Carta em mão'],
@@ -6,6 +6,15 @@ export const OUTCOMES: [Outcome, string][] = [
   ['bloco', 'Bloco'], ['recusou', 'Não quis falar'], ['falei', 'Falei'],
 ]
 export const outcomeLabel = (o: Outcome) => OUTCOMES.find(x => x[0] === o)?.[1] ?? o
+/** Resultados que se escolhem na porta (as entregas registam-se à parte, como peça + canal). */
+export const RESULTS: [Outcome, string][] = [['falei', 'Falei'], ['recusou', 'Não quis falar'], ['nao_abriu', 'Não abriu'], ['caixa_cheia', 'Caixa cheia']]
+export const CHANNELS: [Channel, string][] = [['porta', 'Na porta'], ['caixa', 'Caixa do correio'], ['mao', 'Em mão']]
+export const channelLabel = (c: Channel) => CHANNELS.find(x => x[0] === c)?.[1] ?? 'canal ?'
+export const deliveryLabel = (d: Delivery, pieces: Piece[]) =>
+  `${pieces.find(p => p.id === d.piece)?.short_name ?? 'peça ?'}${d.channel === '?' ? '' : ' · ' + channelLabel(d.channel).toLowerCase()}`
+/** Texto curto do resultado de uma porta: resultados + entregas. */
+export const resultText = (r: { outcomes: Outcome[]; deliveries?: Delivery[] }, pieces: Piece[]) =>
+  [...r.outcomes.map(outcomeLabel), ...(r.deliveries ?? []).map(d => deliveryLabel(d, pieces))].join(' + ')
 
 export const ROLES: [Role, string][] = [
   ['proprietario', 'Proprietário'], ['inquilino', 'Inquilino'], ['familiar', 'Familiar'], ['empregada', 'Empregada'],

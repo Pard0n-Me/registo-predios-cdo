@@ -1,8 +1,9 @@
 import { flash } from '../components/Toast'
 import { useEffect, useMemo, useState } from 'react'
 import { getBuildingFull, saveVisit, unitLabel, type ResultInput } from '../data/store'
-import type { BuildingFull, Outcome, Person, Role } from '../types'
-import { COMPANIONS, OUTCOMES, ROLES, cellClass, fmtDateTime, outcomeLabel, toLocalInput } from '../ui'
+import type { BuildingFull, Channel, Delivery, Outcome, Person, Piece, Role } from '../types'
+import { CHANNELS, COMPANIONS, RESULTS, ROLES, cellClass, deliveryLabel, fmtDateTime, resultText, toLocalInput } from '../ui'
+import { usePieces } from '../data/pieces'
 
 interface Draft { visitedAt: string; companion: string | null; generalNote: string; results: Record<string, ResultInput> }
 const draftKey = (id: string, visitId?: string) => `visita-rascunho-${id}${visitId ? '-' + visitId : ''}`
@@ -31,16 +32,17 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
       if (visitId && !v) { setErr('Visita não encontrada (foi apagada?).'); return }
       if (v) setD(cur => cur ?? {
         visitedAt: toLocalInput(new Date(v.visited_at)), companion: v.companion, generalNote: v.general_note ?? '',
-        results: Object.fromEntries(x.results.filter(r => r.visit_id === v.id).map(r => [r.unit_id, { unitId: r.unit_id, outcomes: r.outcomes, note: r.note ?? '' }])),
+        results: Object.fromEntries(x.results.filter(r => r.visit_id === v.id).map(r => [r.unit_id, { unitId: r.unit_id, outcomes: r.outcomes, deliveries: r.deliveries ?? [], note: r.note ?? '' }])),
       })
     }).catch(e => setErr(e.message))
   }, [id, visitId])
   useEffect(() => { if (d && dirty) try { localStorage.setItem(key, JSON.stringify(d)) } catch { /* sem armazenamento */ } }, [d, dirty, key])
 
+  const pieces = usePieces()
   const unitBy = useMemo(() => new Map((f?.units ?? []).map(u => [u.label, u])), [f])
   if (!f || !d) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
   const b = f.building
-  const count = Object.values(d.results).filter(r => r.outcomes.length || r.note).length
+  const count = Object.values(d.results).filter(r => r.outcomes.length || r.note || r.deliveries?.length).length
   // quem já ficou registado nesta visita (ao editar), para mostrar na grelha
   const savedPerson = (unitId: string) => {
     const i = visitId && f.interactions.find(x => x.visit_id === visitId && x.unit_id === unitId)
@@ -104,7 +106,7 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
                     const u = unitBy.get(unitLabel(fl.label, door))
                     const r = u && d.results[u.id]
                     return <button key={door} className={'unit ' + (r ? cellClass(undefined, { ...r, id: '', visit_id: '', unit_id: u!.id, note: r.note }) : '')} onClick={() => u && setEditing(u.id)}>
-                      <b>{door || fl.label}</b><span>{r ? (r.person?.name || (r.outcomes.includes('falei') && savedPerson(u!.id)) || r.outcomes.map(outcomeLabel).join(' + ') || 'nota') : '—'}</span></button>
+                      <b>{door || fl.label}</b><span>{r ? (r.person?.name || (r.outcomes.includes('falei') && savedPerson(u!.id)) || resultText(r, pieces) || 'nota') : '—'}</span></button>
                   })}
                 </div>
               </div>
@@ -118,15 +120,18 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
         {err && <div className="err">{err}</div>}
       </main>
       <div className="fab"><button className="btn" disabled={busy || (!count && !d.generalNote)} onClick={save}>{busy ? 'A gravar…' : `${visitId ? 'Gravar alterações' : 'Gravar visita'}${count ? ` (${count})` : ''}`}</button></div>
-      {editing && <ResultSheet f={f} unitId={editing} value={d.results[editing]} onClose={() => setEditing(null)}
+      {editing && <ResultSheet f={f} pieces={pieces} unitId={editing} value={d.results[editing]} onClose={() => setEditing(null)}
         onSave={r => { change({ ...d, results: { ...d.results, [editing]: r } }); setEditing(null) }} />}
     </>
   )
 }
 
-function ResultSheet({ f, unitId, value, onClose, onSave }: { f: BuildingFull; unitId: string; value?: ResultInput; onClose: () => void; onSave: (r: ResultInput) => void }) {
+function ResultSheet({ f, pieces, unitId, value, onClose, onSave }: { f: BuildingFull; pieces: Piece[]; unitId: string; value?: ResultInput; onClose: () => void; onSave: (r: ResultInput) => void }) {
   const unit = f.units.find(u => u.id === unitId)!
   const [outcomes, setOutcomes] = useState<Outcome[]>(value?.outcomes ?? [])
+  const [deliveries, setDeliveries] = useState<Delivery[]>(value?.deliveries ?? [])
+  const [piece, setPiece] = useState<string | null>(null)
+  const [warn, setWarn] = useState('')
   const [note, setNote] = useState(value?.note ?? '')
   const known: (Person & { role: Role })[] = f.personUnits.filter(pu => pu.unit_id === unitId)
     .map(pu => ({ ...f.people.find(p => p.id === pu.person_id)!, role: pu.role })).filter(p => p.id)
@@ -134,14 +139,45 @@ function ResultSheet({ f, unitId, value, onClose, onSave }: { f: BuildingFull; u
   const [otherUnit, setOtherUnit] = useState(value?.otherUnitNote?.unitId ?? '')
   const [otherText, setOtherText] = useState(value?.otherUnitNote?.text ?? '')
   const talked = outcomes.includes('falei')
-  const toggle = (o: Outcome) => setOutcomes(x => (x.includes(o) ? x.filter(y => y !== o) : [...x, o]))
+  const toggle = (o: Outcome) => { setWarn(''); setOutcomes(x => (x.includes(o) ? x.filter(y => y !== o) : [...x, o])) }
+  const noAds = f.building.no_ads === 'sim'
+  const active = pieces.filter(x => x.active)
+  const deliver = (c: Channel) => {
+    if (!piece) { setWarn('Escolhe primeiro a peça.'); return }
+    setDeliveries(x => [...x, { piece, channel: c }]); setPiece(null); setWarn('')
+  }
+  const hasResult = outcomes.some(o => RESULTS.some(([r]) => r === o))
+  const ok = () => {
+    if (deliveries.length && !hasResult) { setWarn('Falta o resultado (ex.: Não abriu) antes de registar a entrega.'); return }
+    onSave({
+      unitId, outcomes, deliveries, note,
+      person: talked && p.name.trim() ? p : undefined,
+      otherUnitNote: talked && otherUnit && otherText.trim() ? { unitId: otherUnit, text: otherText } : undefined,
+    })
+  }
 
   return (
     <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="panel">
         <b>{f.building.street}, {f.building.number} · {unit.label}</b>
-        <div className="sub">Podes escolher vários</div>
-        <div className="opts">{OUTCOMES.map(([o, l]) => <button key={o} className={'opt' + (outcomes.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>{l}</button>)}</div>
+        <label className="f">Resultado</label>
+        <div className="opts" style={{ marginTop: 4 }}>{RESULTS.map(([o, l]) => <button key={o} className={'opt' + (outcomes.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>{l}</button>)}</div>
+        <label className="f">Deixei <span className="sub">· toca na peça e depois no canal</span></label>
+        <div className="deliver">
+          <div className="pieces">
+            {active.map(x => <button key={x.id} className={'piece' + (piece === x.id ? ' on' : '')} aria-pressed={piece === x.id} onClick={() => { setPiece(piece === x.id ? null : x.id); setWarn('') }}>
+              {x.thumb ? <img src={x.thumb} alt="" /> : <span className="nothumb" />}<span>{x.short_name}</span></button>)}
+            {!active.length && <div className="sub">Sem peças. Acrescenta-as em Início › Peças de marketing.</div>}
+          </div>
+          <div className="channels">
+            {CHANNELS.map(([c, l]) => <button key={c} className="opt" disabled={c === 'caixa' && noAds} onClick={() => deliver(c)}>{l}</button>)}
+            {noAds && <div className="sub">Prédio com "publicidade não": caixa do correio bloqueada.</div>}
+          </div>
+        </div>
+        {!!deliveries.length && <div className="chips" style={{ marginTop: 8 }}>
+          {deliveries.map((d, i) => <button key={i} className="chip acc" aria-label={`Tirar ${deliveryLabel(d, pieces)}`} onClick={() => setDeliveries(x => x.filter((_, j) => j !== i))}>{deliveryLabel(d, pieces)} ✕</button>)}
+        </div>}
+        {warn && <div className="err" style={{ marginTop: 8 }}>{warn}</div>}
         {talked && <>
           {!!known.length && <><label className="f">Já conheço</label><div className="seg">
             {known.map(k => <button key={k.id} className={'chip' + (p.existingId === k.id ? ' on' : '')}
@@ -164,12 +200,8 @@ function ResultSheet({ f, unitId, value, onClose, onSave }: { f: BuildingFull; u
         </>}
         <label className="f">Nota da porta</label><input className="t" value={note} onChange={e => setNote(e.target.value)} placeholder="ex.: em obras; nome na caixa: …" />
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button className="btn sec" onClick={() => onSave({ unitId, outcomes: [], note: '' })}>Limpar</button>
-          <button className="btn" onClick={() => onSave({
-            unitId, outcomes, note,
-            person: talked && p.name.trim() ? p : undefined,
-            otherUnitNote: talked && otherUnit && otherText.trim() ? { unitId: otherUnit, text: otherText } : undefined,
-          })}>OK</button>
+          <button className="btn sec" onClick={() => onSave({ unitId, outcomes: [], deliveries: [], note: '' })}>Limpar</button>
+          <button className="btn" onClick={ok}>OK</button>
         </div>
       </div>
     </div>
