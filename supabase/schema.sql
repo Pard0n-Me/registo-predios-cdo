@@ -127,6 +127,7 @@ create table if not exists listings (
   active boolean not null default true,
   notes text,
   contact_person_id uuid references people(id) on delete set null,  -- quem atende o anúncio
+  condition text check (condition in ('bom','razoavel','mau','obras','?')),  -- estado dito no anúncio
   created_at timestamptz not null default now()
 );
 

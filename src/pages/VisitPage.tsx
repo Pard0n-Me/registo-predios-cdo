@@ -2,56 +2,95 @@ import { flash } from '../components/Toast'
 import { useEffect, useMemo, useState } from 'react'
 import { getBuildingFull, saveVisit, unitLabel, type ResultInput } from '../data/store'
 import type { BuildingFull, Outcome, Person, Role } from '../types'
-import { COMPANIONS, OUTCOMES, ROLES, cellClass, outcomeLabel, toLocalInput } from '../ui'
+import { COMPANIONS, OUTCOMES, ROLES, cellClass, fmtDateTime, outcomeLabel, toLocalInput } from '../ui'
 
 interface Draft { visitedAt: string; companion: string | null; generalNote: string; results: Record<string, ResultInput> }
-const draftKey = (id: string) => `visita-rascunho-${id}`
-const loadDraft = (id: string): Draft | null => { try { const r = localStorage.getItem(draftKey(id)); return r ? JSON.parse(r) : null } catch { return null } }
+const draftKey = (id: string, visitId?: string) => `visita-rascunho-${id}${visitId ? '-' + visitId : ''}`
+const loadDraft = (key: string): Draft | null => { try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null } catch { return null } }
+const sameDay = (iso: string) => new Date(iso).toDateString() === new Date().toDateString()
 
-export default function VisitPage({ id }: { id: string }) {
+/** Visita nova, ou uma já gravada reaberta para editar (visitId). */
+export default function VisitPage({ id, visitId }: { id: string; visitId?: string }) {
+  const key = draftKey(id, visitId)
   const [f, setF] = useState<BuildingFull | null>(null)
-  const [d, setD] = useState<Draft>(() => loadDraft(id) ?? { visitedAt: toLocalInput(), companion: null, generalNote: '', results: {} })
-  const [restored] = useState(() => !!loadDraft(id))
+  const [restored] = useState(() => !!loadDraft(key))
+  // ao editar sem rascunho, os dados vêm da base quando a ficha carregar
+  const [d, setD] = useState<Draft | null>(() => loadDraft(key) ?? (visitId ? null : { visitedAt: toLocalInput(), companion: null, generalNote: '', results: {} }))
+  const [dirty, setDirty] = useState(restored)
+  const [skipToday, setSkipToday] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const change = (x: Draft) => { setD(x); setDirty(true) }
 
-  useEffect(() => { getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }, [id])
-  useEffect(() => { try { localStorage.setItem(draftKey(id), JSON.stringify(d)) } catch { /* sem armazenamento */ } }, [d, id])
+  useEffect(() => {
+    getBuildingFull(id).then(x => {
+      setF(x)
+      const v = visitId && x.visits.find(y => y.id === visitId)
+      if (visitId && !v) { setErr('Visita não encontrada (foi apagada?).'); return }
+      if (v) setD(cur => cur ?? {
+        visitedAt: toLocalInput(new Date(v.visited_at)), companion: v.companion, generalNote: v.general_note ?? '',
+        results: Object.fromEntries(x.results.filter(r => r.visit_id === v.id).map(r => [r.unit_id, { unitId: r.unit_id, outcomes: r.outcomes, note: r.note ?? '' }])),
+      })
+    }).catch(e => setErr(e.message))
+  }, [id, visitId])
+  useEffect(() => { if (d && dirty) try { localStorage.setItem(key, JSON.stringify(d)) } catch { /* sem armazenamento */ } }, [d, dirty, key])
 
   const unitBy = useMemo(() => new Map((f?.units ?? []).map(u => [u.label, u])), [f])
-  if (!f) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
+  if (!f || !d) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
   const b = f.building
   const count = Object.values(d.results).filter(r => r.outcomes.length || r.note).length
+  // quem já ficou registado nesta visita (ao editar), para mostrar na grelha
+  const savedPerson = (unitId: string) => {
+    const i = visitId && f.interactions.find(x => x.visit_id === visitId && x.unit_id === unitId)
+    return i ? f.people.find(p => p.id === i.person_id)?.name : undefined
+  }
+  const today = !visitId && !restored && !skipToday ? f.visits.find(v => v.origin === 'novo' && sameDay(v.visited_at)) : undefined
 
   const save = async () => {
     setBusy(true); setErr('')
     try {
-      await saveVisit({ buildingId: id, visitedAt: new Date(d.visitedAt).toISOString(), companion: d.companion, generalNote: d.generalNote, results: Object.values(d.results) })
-      try { localStorage.removeItem(draftKey(id)) } catch { /* ignora */ }
-      flash(`Visita gravada${count ? ` · ${count} ${count === 1 ? 'porta' : 'portas'}` : ''}`)
+      await saveVisit({ visitId, buildingId: id, visitedAt: new Date(d.visitedAt).toISOString(), companion: d.companion, generalNote: d.generalNote, results: Object.values(d.results) })
+      try { localStorage.removeItem(key) } catch { /* ignora */ }
+      flash(`${visitId ? 'Visita atualizada' : 'Visita gravada'}${count ? ` · ${count} ${count === 1 ? 'porta' : 'portas'}` : ''}`)
       location.replace(`#/p/${id}`)
     } catch (e) { setErr((e as Error).message + ' · O rascunho continua guardado no telefone.') } finally { setBusy(false) }
   }
-  const discard = () => { if (confirm('Apagar este rascunho de visita?')) { try { localStorage.removeItem(draftKey(id)) } catch { /* ignora */ } location.replace(`#/p/${id}`) } }
+  const discard = () => {
+    if (!confirm(visitId ? 'Descartar as alterações a esta visita?' : 'Apagar este rascunho de visita?')) return
+    try { localStorage.removeItem(key) } catch { /* ignora */ }
+    location.replace(`#/p/${id}`)
+  }
+  const back = () => {
+    if (dirty && !confirm('Sair sem gravar? O que marcaste fica como rascunho neste telefone e volta quando abrires esta visita.')) return
+    history.back()
+  }
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => history.back()}>‹ Prédio</button><h1>Visita · {b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1></header>
+      <header className="top"><button className="linkbtn" onClick={back}>‹ Prédio</button><h1>{visitId ? 'Editar visita' : 'Visita'} · {b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1></header>
       <main>
-        {restored && <div className="note">Rascunho recuperado deste telefone. <button className="linkbtn" onClick={discard}>Apagar</button></div>}
+        {restored && <div className="note">{visitId ? 'Alterações por gravar recuperadas deste telefone.' : 'Rascunho recuperado deste telefone.'} <button className="linkbtn" onClick={discard}>{visitId ? 'Descartar' : 'Apagar'}</button></div>}
+        {today && <div className="card" style={{ borderLeft: '4px solid var(--accent)' }}>
+          <b>Já há uma visita de hoje a este prédio</b>
+          <div className="sub">{(() => { const n = f.results.filter(r => r.visit_id === today.id).length; return `${fmtDateTime(today.visited_at)} · ${n} ${n === 1 ? 'porta' : 'portas'}` })()}{today.companion ? ` · com ${today.companion}` : ''}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button className="btn" onClick={() => location.replace(`#/p/${id}/visita/${today.id}`)}>Continuar essa visita</button>
+            <button className="btn sec" onClick={() => setSkipToday(true)}>É outra visita</button>
+          </div>
+        </div>}
         <div className="card">
           <h2>Acompanhante</h2>
           <div className="seg">
-            <button className={'chip' + (d.companion === null ? ' on' : '')} onClick={() => setD({ ...d, companion: null })}>Sozinho</button>
-            {COMPANIONS.map(c => <button key={c} className={'chip' + (d.companion === c ? ' on' : '')} onClick={() => setD({ ...d, companion: c })}>{c}</button>)}
+            <button className={'chip' + (d.companion === null ? ' on' : '')} onClick={() => change({ ...d, companion: null })}>Sozinho</button>
+            {COMPANIONS.map(c => <button key={c} className={'chip' + (d.companion === c ? ' on' : '')} onClick={() => change({ ...d, companion: c })}>{c}</button>)}
             {other || (d.companion && !COMPANIONS.includes(d.companion))
-              ? <input className="t" style={{ width: 140 }} placeholder="Nome" value={d.companion && !COMPANIONS.includes(d.companion) ? d.companion : other} onChange={e => { setOther(e.target.value); setD({ ...d, companion: e.target.value || null }) }} />
+              ? <input className="t" style={{ width: 140 }} placeholder="Nome" value={d.companion && !COMPANIONS.includes(d.companion) ? d.companion : other} onChange={e => { setOther(e.target.value); change({ ...d, companion: e.target.value || null }) }} />
               : <button className="chip" onClick={() => setOther(' ')}>+ outro</button>}
           </div>
           <label className="f">Data e hora</label>
-          <input className="t" type="datetime-local" value={d.visitedAt} onChange={e => setD({ ...d, visitedAt: e.target.value })} />
+          <input className="t" type="datetime-local" value={d.visitedAt} onChange={e => change({ ...d, visitedAt: e.target.value })} />
         </div>
         <div className="card">
           <h2>Toca numa fração</h2>
@@ -65,7 +104,7 @@ export default function VisitPage({ id }: { id: string }) {
                     const u = unitBy.get(unitLabel(fl.label, door))
                     const r = u && d.results[u.id]
                     return <button key={door} className={'unit ' + (r ? cellClass(undefined, { ...r, id: '', visit_id: '', unit_id: u!.id, note: r.note }) : '')} onClick={() => u && setEditing(u.id)}>
-                      <b>{door || fl.label}</b><span>{r ? (r.person?.name || r.outcomes.map(outcomeLabel).join(' + ') || 'nota') : '—'}</span></button>
+                      <b>{door || fl.label}</b><span>{r ? (r.person?.name || (r.outcomes.includes('falei') && savedPerson(u!.id)) || r.outcomes.map(outcomeLabel).join(' + ') || 'nota') : '—'}</span></button>
                   })}
                 </div>
               </div>
@@ -74,13 +113,13 @@ export default function VisitPage({ id }: { id: string }) {
         </div>
         <div className="card">
           <h2>Nota geral</h2>
-          <textarea className="t" placeholder="ex.: não entrámos; cartas no correio interior" value={d.generalNote} onChange={e => setD({ ...d, generalNote: e.target.value })} />
+          <textarea className="t" placeholder="ex.: não entrámos; cartas no correio interior" value={d.generalNote} onChange={e => change({ ...d, generalNote: e.target.value })} />
         </div>
         {err && <div className="err">{err}</div>}
       </main>
-      <div className="fab"><button className="btn" disabled={busy || (!count && !d.generalNote)} onClick={save}>{busy ? 'A gravar…' : `Gravar visita${count ? ` (${count})` : ''}`}</button></div>
+      <div className="fab"><button className="btn" disabled={busy || (!count && !d.generalNote)} onClick={save}>{busy ? 'A gravar…' : `${visitId ? 'Gravar alterações' : 'Gravar visita'}${count ? ` (${count})` : ''}`}</button></div>
       {editing && <ResultSheet f={f} unitId={editing} value={d.results[editing]} onClose={() => setEditing(null)}
-        onSave={r => { setD(x => ({ ...x, results: { ...x.results, [editing]: r } })); setEditing(null) }} />}
+        onSave={r => { change({ ...d, results: { ...d.results, [editing]: r } }); setEditing(null) }} />}
     </>
   )
 }

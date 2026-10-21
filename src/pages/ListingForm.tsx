@@ -1,8 +1,8 @@
 import { flash } from '../components/Toast'
 import { useEffect, useState } from 'react'
 import { addPersonToUnit, createPerson, getBuildingFull, saveListing } from '../data/store'
-import type { BuildingFull, Listing, Role } from '../types'
-import { ROLES, fmtDate, fmtPrice } from '../ui'
+import type { BuildingFull, Cond, Listing, Role } from '../types'
+import { COND, ROLES, fmtDate, fmtPrice } from '../ui'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -10,7 +10,7 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
   const [f, setF] = useState<BuildingFull | null>(null)
   const [l, setL] = useState<Partial<Listing>>({
     building_id: buildingId, unit_id: unitId ?? null, operation: 'venda', first_seen: today(), first_seen_uncertain: false,
-    advertiser_type: '?', active: true, source: 'radar',
+    advertiser_type: '?', active: true, source: null,
   })
   const [price, setPrice] = useState('')
   const [priceAt, setPriceAt] = useState(today())
@@ -42,12 +42,17 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
       }
       // só manda o campo quando há contacto ou quando se tira um que existia (a coluna é de 20/10)
       const withContact = contactId || l.contact_person_id ? { contact_person_id: contactId ?? null } : {}
-      await saveListing({ ...l, ...withContact, building_id: buildingId, price: p, price_at: listingId ? priceAt : l.first_seen })
-      flash(listingId ? 'Anúncio atualizado' : 'Anúncio gravado')
+      // o estado também só vai quando há valor (a coluna é de 21/10)
+      const { condition, ...rest } = l
+      const had = listingId ? f.listings.find(x => x.id === listingId)?.condition : null
+      const withCond = (condition && condition !== '?') || had ? { condition: condition ?? null } : {}
+      const { kept } = await saveListing({ ...rest, ...withContact, ...withCond, building_id: buildingId, price: p, price_at: listingId ? priceAt : l.first_seen })
+      flash((listingId ? 'Anúncio atualizado' : 'Anúncio gravado') + (kept.length ? ` · a fração mantém ${kept.join(', ')}` : ''))
       location.replace(`#/p/${buildingId}`)
     } catch (e) {
       const m = (e as Error).message
-      setErr(/contact_person_id/.test(m) ? 'Falta acrescentar a coluna do contacto na Supabase: corre o ficheiro supabase/migracoes/2026-10-20-contacto-anuncio.sql no SQL Editor.' : m)
+      setErr(/contact_person_id/.test(m) ? 'Falta acrescentar a coluna do contacto na Supabase: corre o ficheiro supabase/migracoes/2026-10-20-contacto-anuncio.sql no SQL Editor.'
+        : /condition/.test(m) ? 'Falta acrescentar a coluna do estado na Supabase: corre o ficheiro supabase/migracoes/2026-10-21-estado-anuncio.sql no SQL Editor. (Sem estado escolhido, grava na mesma.)' : m)
     } finally { setBusy(false) }
   }
   const candidates = [...f.people].sort((a, b) => {
@@ -74,6 +79,11 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
             <div><label className="f">Tipologia</label><input className="t" value={l.typology ?? ''} placeholder="T2" onChange={e => set('typology', e.target.value || null)} /></div>
             <div><label className="f">Área (m²)</label><input className="t" inputMode="decimal" value={l.area_m2 ?? ''} onChange={e => set('area_m2', e.target.value ? +e.target.value.replace(',', '.') : null)} /></div>
           </div>
+          <label className="f" htmlFor="estado">Estado de conservação</label>
+          <select id="estado" className="t" value={l.condition ?? '?'} onChange={e => set('condition', e.target.value as Cond)}>
+            {COND.map(([c, t]) => <option key={c} value={c}>{c === '?' ? '? (o anúncio não diz)' : t}</option>)}
+          </select>
+          {l.unit_id && <div className="sub" style={{ marginTop: 4 }}>Tipologia, área e estado passam para a fração só se lá estiverem vazios.</div>}
           <label className="f">Anunciante</label>
           <div className="seg">{([['particular', 'Particular (FSBO)'], ['agencia', 'Agência'], ['promotor', 'Promotor'], ['?', '?']] as const).map(([v, t]) =>
             <button key={v} className={'chip' + (l.advertiser_type === v ? ' on' : '')} onClick={() => set('advertiser_type', v)}>{t}</button>)}</div>

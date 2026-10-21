@@ -30,7 +30,7 @@ function route(hash: string) {
   if (p[0] === 'p' && p[1]) {
     const id = p[1]
     if (p[2] === 'editar') return <BuildingForm key={'e' + id} id={id} />
-    if (p[2] === 'visita') return <VisitPage key={'v' + id} id={id} />
+    if (p[2] === 'visita') return <VisitPage key={'v' + id + (p[3] ?? '')} id={id} visitId={p[3]} />
     if (p[2] === 'f' && p[3]) return <UnitPage key={p[3]} buildingId={id} unitId={p[3]} />
     if (p[2] === 'anuncio') return <ListingForm key={'l' + (p[3] ?? 'novo')} buildingId={id} listingId={p[3]} unitId={q.get('unit') ?? undefined} />
     return <BuildingPage key={id} id={id} />

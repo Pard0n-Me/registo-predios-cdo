@@ -3,6 +3,7 @@ import type {
   Building, BuildingFull, BuildingSummary, Floor, Interaction, Listing, ListingPrice, Outcome,
   Person, PersonUnit, Role, Unit, UnitNote, Visit, VisitResult,
 } from '../types'
+import { condLabel } from '../ui'
 
 export const unitLabel = (floor: string, door: string) => (door ? `${floor} ${door}` : floor)
 
@@ -13,8 +14,13 @@ export async function listBuildings(): Promise<BuildingSummary[]> {
   return buildings.map(b => {
     const vs = visits.filter(v => v.building_id === b.id)
     const last = vs.map(v => v.visited_at).sort().at(-1) ?? null
-    return { building: b, lastVisit: last, visitCount: vs.length, activeListings: listings.filter(l => l.building_id === b.id && l.active).length,
-      activeFsbo: listings.filter(l => l.building_id === b.id && l.active && l.advertiser_type === 'particular').length }
+    const ls = listings.filter(l => l.building_id === b.id)
+    const sale = ls.filter(l => l.active && l.operation === 'venda')
+    const lastL = ls.filter(l => l.source !== 'legado' && l.created_at).sort((x, y) => y.created_at!.localeCompare(x.created_at!))[0]
+    return { building: b, lastVisit: last, visitCount: vs.length, activeListings: sale.length,
+      activeFsbo: sale.filter(l => l.advertiser_type === 'particular').length,
+      activeRentals: ls.filter(l => l.active && l.operation === 'arrendamento').length,
+      lastListing: lastL ? { at: lastL.created_at!, source: lastL.source } : null }
   })
 }
 
@@ -79,6 +85,8 @@ export interface ResultInput {
   otherUnitNote?: { unitId: string; text: string }
 }
 export interface VisitInput {
+  /** Visita já gravada que se está a editar (reabrir ou continuar a de hoje). */
+  visitId?: string
   buildingId: string
   visitedAt: string
   companion: string | null
@@ -86,14 +94,20 @@ export interface VisitInput {
   results: ResultInput[]
 }
 
+/** Grava uma visita nova ou atualiza uma já gravada (os resultados por fração são substituídos, sem duplicar). */
 export async function saveVisit(v: VisitInput): Promise<Visit> {
-  const visit = await db.insert<Visit>('visits', {
-    building_id: v.buildingId, visited_at: v.visitedAt, year_uncertain: false,
-    companion: v.companion, general_note: v.generalNote || null, raw_text: null, origin: 'novo',
-  })
+  const fields = { visited_at: v.visitedAt, companion: v.companion, general_note: v.generalNote || null }
+  const visit = v.visitId
+    ? await db.update<Visit>('visits', v.visitId, fields)
+    : await db.insert<Visit>('visits', { ...fields, building_id: v.buildingId, year_uncertain: false, raw_text: null, origin: 'novo' })
+  const [oldResults, oldInts] = v.visitId
+    ? await Promise.all([db.where<VisitResult>('visit_results', 'visit_id', visit.id), db.where<Interaction>('interactions', 'visit_id', visit.id)])
+    : [[], []]
   for (const r of v.results) {
-    if (!r.outcomes.length && !r.note) continue
-    await db.insert('visit_results', { visit_id: visit.id, unit_id: r.unitId, outcomes: r.outcomes, note: r.note || null })
+    const old = oldResults.find(x => x.unit_id === r.unitId)
+    if (!r.outcomes.length && !r.note) { if (old) await db.remove('visit_results', old.id); continue }
+    if (old) await db.update('visit_results', old.id, { outcomes: r.outcomes, note: r.note || null })
+    else await db.insert('visit_results', { visit_id: visit.id, unit_id: r.unitId, outcomes: r.outcomes, note: r.note || null })
     let source: string | null = null
     if (r.person && r.person.name.trim()) {
       const p = r.person
@@ -111,7 +125,10 @@ export async function saveVisit(v: VisitInput): Promise<Visit> {
         await db.update('people', personId, patch)
       }
       await db.upsert('person_units', { person_id: personId, unit_id: r.unitId, role: p.role }, ['person_id', 'unit_id'])
-      await db.insert('interactions', { person_id: personId, unit_id: r.unitId, visit_id: visit.id, at: v.visitedAt, notes: p.conversation || null })
+      // ao editar, a mesma pessoa na mesma porta e visita não ganha uma segunda conversa
+      const same = oldInts.find(i => i.person_id === personId && i.unit_id === r.unitId)
+      if (same) { if (p.conversation) await db.update('interactions', same.id, { notes: [same.notes, p.conversation].filter(Boolean).join('\n') }) }
+      else await db.insert('interactions', { person_id: personId, unit_id: r.unitId, visit_id: visit.id, at: v.visitedAt, notes: p.conversation || null })
       source = p.name.trim()
     }
     if (r.otherUnitNote && r.otherUnitNote.text.trim()) {
@@ -122,11 +139,11 @@ export async function saveVisit(v: VisitInput): Promise<Visit> {
 }
 
 export async function deleteVisit(id: string) { return db.remove('visits', id) }
-/** Apaga o anúncio (e os preços). Se a fração ficou sem anúncios ativos, deixa de estar marcada como à venda. */
+/** Apaga o anúncio (e os preços). Se a fração ficou sem anúncios de venda ativos, deixa de estar marcada como à venda. */
 export async function deleteListing(l: Listing) {
   await db.remove('listings', l.id)
   if (!l.unit_id) return
-  const others = (await db.where<Listing>('listings', 'unit_id', l.unit_id)).filter(x => x.active)
+  const others = (await db.where<Listing>('listings', 'unit_id', l.unit_id)).filter(x => x.active && x.operation === 'venda')
   const [u] = await db.where<Unit>('units', 'id', l.unit_id)
   if (!others.length && u && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
 }
@@ -218,20 +235,33 @@ export async function searchPeople(q: string): Promise<Person[]> {
 }
 
 export interface ListingInput extends Partial<Listing> { building_id: string; price?: number | null; price_at?: string }
-export async function saveListing(l: ListingInput): Promise<Listing> {
+/**
+ * Grava o anúncio e acerta a fração. Devolve as diferenças que não foram passadas à fração
+ * (ex.: a fração já diz T3 e o anúncio diz T2), para avisar sem sobrescrever.
+ */
+export async function saveListing(l: ListingInput): Promise<{ listing: Listing; kept: string[] }> {
   const { id, price, price_at, ...data } = l
   const saved = id ? await db.update<Listing>('listings', id, data) : await db.insert<Listing>('listings', data)
   if (price) await db.insert('listing_prices', { listing_id: saved.id, at: price_at || saved.first_seen, price })
-  // O estado da fração acompanha o anúncio, também ao editar (ativar, retirar, mudar de anunciante)
+  const kept: string[] = []
   if (saved.unit_id) {
     const [u] = await db.where<Unit>('units', 'id', saved.unit_id)
+    // O anúncio só preenche o que a fração não tem; o que já lá está não muda
+    if (u) {
+      const patch: Partial<Unit> = {}
+      if (saved.typology) { if (!u.typology) patch.typology = saved.typology; else if (u.typology !== saved.typology) kept.push(`tipologia ${u.typology}`) }
+      if (saved.area_m2 != null) { if (u.area_m2 == null) patch.area_m2 = saved.area_m2; else if (+u.area_m2 !== +saved.area_m2) kept.push(`área ${u.area_m2} m²`) }
+      if (saved.condition && saved.condition !== '?') { if (u.condition === '?') patch.condition = saved.condition; else if (u.condition !== saved.condition) kept.push(`estado ${condLabel(u.condition).toLowerCase()}`) }
+      if (Object.keys(patch).length) await db.update('units', u.id, patch)
+    }
+    // O estado da fração acompanha o anúncio, também ao editar (ativar, retirar, mudar de anunciante)
     const active = (await db.where<Listing>('listings', 'unit_id', saved.unit_id)).filter(x => x.active && x.operation === 'venda')
     const want = active.length ? (active.some(x => x.advertiser_type === 'particular') ? 'fsbo' : 'fsba') : null
     if (u && want && u.commercial_status !== want && (u.commercial_status === 'nada' || u.commercial_status === 'fsbo' || u.commercial_status === 'fsba'))
       await db.update('units', u.id, { commercial_status: want })
     if (u && !want && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
   }
-  return saved
+  return { listing: saved, kept }
 }
 
 export function norm(s: string) {

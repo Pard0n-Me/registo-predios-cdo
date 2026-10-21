@@ -119,6 +119,9 @@ export interface Listing {
   notes: string | null
   /** Quem atende o anúncio (dono num FSBO, agente num FSBA). Coluna acrescentada a 20/10. */
   contact_person_id?: string | null
+  /** Estado de conservação dito no anúncio. Coluna acrescentada a 21/10. */
+  condition?: Cond | null
+  created_at?: string
 }
 
 export interface ListingPrice { id: string; listing_id: string; at: string; price: number }
@@ -139,7 +142,11 @@ export interface BuildingFull {
 export interface BuildingSummary {
   building: Building
   lastVisit: string | null
+  /** Só anúncios de venda: o arrendamento não conta para "à venda", filtros nem cor do pino. */
   activeListings: number
   activeFsbo: number
+  activeRentals: number
+  /** Último anúncio inserido (sem o legado), para ordenar a lista. */
+  lastListing: { at: string; source: string | null } | null
   visitCount: number
 }

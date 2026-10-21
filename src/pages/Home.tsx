@@ -9,8 +9,8 @@ import { fmtDate, go } from '../ui'
 
 type Show = 'todos' | 'ativos' | 'fsbo'
 const loadShow = (): Show => { try { return (localStorage.getItem('filtro-predios') as Show) || 'todos' } catch { return 'todos' } }
-type Sort = 'visita' | 'criado' | 'rua' | 'perto'
-const SORTS: [Sort, string][] = [['visita', 'Última visita'], ['criado', 'Mais recentes'], ['rua', 'Rua (A–Z)'], ['perto', 'Mais perto']]
+type Sort = 'visita' | 'anuncio' | 'criado' | 'rua' | 'perto'
+const SORTS: [Sort, string][] = [['visita', 'Última visita'], ['anuncio', 'Último anúncio'], ['criado', 'Mais recentes'], ['rua', 'Rua (A–Z)'], ['perto', 'Mais perto']]
 const loadSort = (): Sort => { try { return (localStorage.getItem('ordem-predios') as Sort) || 'visita' } catch { return 'visita' } }
 /** Distância aproximada em metros (suficiente para ordenar dentro do bairro). */
 const dist = (a: { lat: number; lng: number }, lat: number | null, lng: number | null) =>
@@ -29,7 +29,9 @@ function summaryLine(s: BuildingSummary) {
   const n = s.building.floors.reduce((a, f) => a + f.doors.length, 0)
   const parts = [n ? `${n} frações` : 'grelha por definir']
   parts.push(s.lastVisit ? `última visita ${fmtDate(s.lastVisit)}` : 'sem visitas')
-  if (s.activeListings) parts.push(`${s.activeListings} ${s.activeListings === 1 ? "anúncio ativo" : "anúncios ativos"}`)
+  if (s.activeListings) parts.push(`${s.activeListings} ${s.activeListings === 1 ? 'anúncio de venda' : 'anúncios de venda'}`)
+  if (s.activeRentals) parts.push(`${s.activeRentals} ${s.activeRentals === 1 ? 'arrendamento' : 'arrendamentos'}`)
+  if (s.lastListing) parts.push(`anúncio inserido ${fmtDate(s.lastListing.at)} (${s.lastListing.source === 'radar' ? 'radar' : 'manual'})`)
   return parts.join(' · ')
 }
 
@@ -72,6 +74,7 @@ export default function Home() {
       a.building.street.localeCompare(b.building.street, 'pt') || a.building.number.localeCompare(b.building.number, 'pt', { numeric: true })
     const cmp: Record<Sort, (a: BuildingSummary, b: BuildingSummary) => number> = {
       visita: (a, b) => (b.lastVisit ?? '').localeCompare(a.lastVisit ?? '') || byStreet(a, b),
+      anuncio: (a, b) => (b.lastListing?.at ?? '').localeCompare(a.lastListing?.at ?? '') || byStreet(a, b),
       criado: (a, b) => (b.building.created_at ?? '').localeCompare(a.building.created_at ?? '') || byStreet(a, b),
       rua: byStreet,
       perto: (a, b) => here ? dist(here, a.building.lat, a.building.lng) - dist(here, b.building.lat, b.building.lng) || byStreet(a, b) : byStreet(a, b),
@@ -111,7 +114,7 @@ export default function Home() {
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
           </button>
           <div className="maplegend" aria-label="Legenda">
-            <span><i className="dot" style={{ background: '#a63a32' }} />Anúncio</span>
+            <span><i className="dot" style={{ background: '#a63a32' }} />À venda</span>
             <span><i className="dot" style={{ background: '#2f7d4f' }} />&lt; 6 meses</span>
             <span><i className="dot" style={{ background: '#b26a00' }} />Antiga</span>
             <span><i className="dot" style={{ background: '#9c958a' }} />Nunca</span>
@@ -127,7 +130,7 @@ export default function Home() {
               </select>
             </div>
             <div className="seg scroll-x" role="group" aria-label="Filtrar prédios" style={{ marginBottom: 4 }}>
-              {([['todos', 'Todos'], ['ativos', 'Anúncio ativo'], ['fsbo', 'Só FSBO']] as [Show, string][]).map(([v, l]) =>
+              {([['todos', 'Todos'], ['ativos', 'À venda'], ['fsbo', 'Só FSBO']] as [Show, string][]).map(([v, l]) =>
                 <button key={v} className={'chip' + (show === v ? ' on' : '')} aria-pressed={show === v} onClick={() => chooseShow(v)}>{l}</button>)}
             </div>
             {geoErr && sort === 'perto' && <div className="sub">{geoErr}</div>}

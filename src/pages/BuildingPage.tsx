@@ -215,6 +215,7 @@ function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClos
       })}
       {!!notes.length && <><h2 style={{ marginTop: 14 }}>Disseram sobre outras frações</h2>
         {notes.map(n => <div key={n.id} className="row" style={{ display: 'block' }}><a href={`#/p/${bid}/f/${n.unit_id}`}>{f.units.find(u => u.id === n.unit_id)?.label}</a> <span className="sub">· {n.source ?? '?'}</span><div>{n.text}</div></div>)}</>}
+      <button className="btn sec" style={{ width: '100%', marginTop: 12 }} onClick={() => go(`/p/${bid}/visita/${v.id}`)}>Reabrir e editar</button>
     </>
   } else {
     const l = ev.l
@@ -223,6 +224,7 @@ function Detail({ ev, f, onClose, onDeleted }: { ev: Ev; f: BuildingFull; onClos
       ['Fração', f.units.find(u => u.id === l.unit_id)?.label ?? l.floor_hint ?? '?'],
       ['Operação', l.operation === 'venda' ? 'Venda' : 'Arrendamento'],
       ['Tipologia · área', `${l.typology ?? '?'} · ${l.area_m2 ? l.area_m2 + ' m²' : '?'}`],
+      ['Estado de conservação', l.condition ? condLabel(l.condition) : '?'],
       ['Anunciante', l.advertiser_type === 'particular' ? 'Particular (FSBO)' : `${l.advertiser ?? '?'}${l.advertiser_type !== '?' ? ` (${l.advertiser_type})` : ''}`],
       ['Exclusividade', l.exclusivity ?? '?'], ['Fonte', l.source ?? '?'], ['Estado', l.active ? 'Ativo' : 'Retirado'],
     ]
