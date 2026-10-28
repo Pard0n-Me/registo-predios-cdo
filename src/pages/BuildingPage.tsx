@@ -29,7 +29,7 @@ function chips(b: Building): [string, string][] {
   return out
 }
 
-type Ev = { kind: 'visit'; at: string; v: Visit } | { kind: 'listing'; at: string; l: Listing }
+export type Ev = { kind: 'visit'; at: string; v: Visit } | { kind: 'listing'; at: string; l: Listing }
 
 export default function BuildingPage({ id }: { id: string }) {
   const pieces = usePieces()
@@ -178,7 +178,8 @@ function listingLine(l: Listing, f: BuildingFull) {
   return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · retirado</span>}</>
 }
 
-function Detail({ ev, f, pieces, onClose, onDeleted }: { ev: Ev; f: BuildingFull; pieces: Piece[]; onClose: () => void; onDeleted: () => void }) {
+/** Resumo de uma visita ou de um anúncio (folha de baixo). Usado no histórico do prédio e na ficha da fração. */
+export function Detail({ ev, f, pieces, onClose, onDeleted }: { ev: Ev; f: BuildingFull; pieces: Piece[]; onClose: () => void; onDeleted: () => void }) {
   const bid = f.building.id
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)

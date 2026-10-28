@@ -6,6 +6,8 @@ import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUn
 import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '../types'
 import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel } from '../ui'
 import { usePieces } from '../data/pieces'
+import { Detail } from './BuildingPage'
+import type { Listing } from '../types'
 
 export default function UnitPage({ buildingId, unitId }: { buildingId: string; unitId: string }) {
   const pieces = usePieces()
@@ -17,6 +19,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const [target, setTarget] = useState('')
   const [confirmMerge, setConfirmMerge] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [openListing, setOpenListing] = useState<Listing | null>(null)
   const EMPTY_P = { name: '', role: 'proprietario' as Role, phone: '', email: '', traits: '', notes: '' }
   const [adding, setAdding] = useState(false)
   const [np, setNp] = useState(EMPTY_P)
@@ -154,7 +157,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           {!listings.length && <div className="sub">Nenhum.</div>}
           {listings.map(l => {
             const p = f.prices.filter(x => x.listing_id === l.id).sort((a, b) => b.at.localeCompare(a.at))[0]
-            return <div key={l.id} className="row click" onClick={() => go(`/p/${buildingId}/anuncio/${l.id}`)}>
+            return <div key={l.id} className="row click" onClick={() => setOpenListing(l)}>
               <div>{fmtDate(l.first_seen, l.first_seen_uncertain)} · {l.operation} · {l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser ?? '?'}{p ? ` · ${fmtPrice(p.price)}` : ''}<div className="sub">{l.active ? 'ativo' : 'retirado'}{(() => { const c = f.people.find(x => x.id === l.contact_person_id); return c ? ` · contacto: ${c.name}${c.phone ? ' ' + c.phone : ''}` : '' })()}</div></div>›
             </div>
           })}
@@ -177,6 +180,8 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           </div>)}
         </div>
       </main>
+      {openListing && <Detail ev={{ kind: 'listing', at: openListing.first_seen, l: openListing }} f={f} pieces={pieces} onClose={() => setOpenListing(null)}
+        onDeleted={() => { flash('Anúncio apagado'); setOpenListing(null); load() }} />}
     </>
   )
 }

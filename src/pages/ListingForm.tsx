@@ -109,6 +109,7 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
           </div>}
           <label className="f">Exclusividade</label><input className="t" value={l.exclusivity ?? ''} placeholder="sim / não / até quando" onChange={e => set('exclusivity', e.target.value || null)} />
           <label className="f">Link</label><input className="t" type="url" value={l.url ?? ''} onChange={e => set('url', e.target.value || null)} />
+          {/^https?:\/\//.test(l.url ?? '') && <div style={{ marginTop: 6 }}><a href={l.url!} target="_blank" rel="noreferrer">Abrir anúncio ↗</a></div>}
           <div className="two">
             <div><label className="f">Visto pela 1.ª vez</label><input className="t" type="date" value={l.first_seen} onChange={e => set('first_seen', e.target.value)} /></div>
             <div><label className="f">Fonte</label><input className="t" list="fontes" value={l.source ?? ''} onChange={e => set('source', e.target.value || null)} /></div>
