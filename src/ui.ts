@@ -3,11 +3,16 @@ import type { Channel, CommercialStatus, Cond, Delivery, Outcome, Piece, Role, T
 export const OUTCOMES: [Outcome, string][] = [
   ['nao_abriu', 'Não abriu'], ['caixa_cheia', 'Caixa cheia'], ['carta_mao', 'Carta em mão'],
   ['carta_correio', 'Carta no correio'], ['carta_porta', 'Carta na porta'], ['postal', 'Postal'],
-  ['bloco', 'Bloco'], ['recusou', 'Não quis falar'], ['falei', 'Falei'],
+  ['bloco', 'Bloco'], ['recusou', 'Não quis falar'], ['falei', 'Falei'], ['no_correio', 'No correio'],
 ]
 export const outcomeLabel = (o: Outcome) => OUTCOMES.find(x => x[0] === o)?.[1] ?? o
 /** Resultados que se escolhem na porta (as entregas registam-se à parte, como peça + canal). */
-export const RESULTS: [Outcome, string][] = [['falei', 'Falei'], ['recusou', 'Não quis falar'], ['nao_abriu', 'Não abriu'], ['caixa_cheia', 'Caixa cheia']]
+// Duas colunas no ecrã da porta: à esquerda o contacto, à direita o correio. "No correio" = deixei na caixa sem tocar.
+export const RESULT_COLS: [Outcome, string][][] = [
+  [['falei', 'Falei'], ['nao_abriu', 'Não abriu'], ['recusou', 'Não quis falar']],
+  [['no_correio', 'No correio'], ['caixa_cheia', 'Caixa cheia']],
+]
+export const RESULTS: [Outcome, string][] = RESULT_COLS.flat()
 export const CHANNELS: [Channel, string][] = [['porta', 'Na porta'], ['caixa', 'Caixa do correio'], ['mao', 'Em mão']]
 export const channelLabel = (c: Channel) => CHANNELS.find(x => x[0] === c)?.[1] ?? 'canal ?'
 export const deliveryLabel = (d: Delivery, pieces: Piece[]) =>

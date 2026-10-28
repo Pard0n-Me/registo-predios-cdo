@@ -162,3 +162,5 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 .channels .opt:disabled{opacity:.45;cursor:not-allowed}
 /* Peças de marketing (gestão) */
 .pthumb{width:56px;height:56px;object-fit:cover;border-radius:10px;background:var(--grey-soft);flex:none}
+.result-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.result-col{display:flex;flex-direction:column;gap:8px}

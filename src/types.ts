@@ -60,7 +60,7 @@ export interface Visit {
 
 export type Outcome =
   | 'nao_abriu' | 'caixa_cheia' | 'carta_mao' | 'carta_correio' | 'carta_porta'
-  | 'postal' | 'bloco' | 'recusou' | 'falei'
+  | 'postal' | 'bloco' | 'recusou' | 'falei' | 'no_correio'
 
 /** Canal de entrega de uma peça de marketing. */
 export type Channel = 'porta' | 'caixa' | 'mao' | '?'

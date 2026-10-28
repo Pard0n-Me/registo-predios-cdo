@@ -2,7 +2,7 @@ import { flash } from '../components/Toast'
 import { useEffect, useMemo, useState } from 'react'
 import { getBuildingFull, saveVisit, unitLabel, type ResultInput } from '../data/store'
 import type { BuildingFull, Channel, Delivery, Outcome, Person, Piece, Role } from '../types'
-import { CHANNELS, COMPANIONS, RESULTS, ROLES, cellClass, deliveryLabel, fmtDateTime, resultText, toLocalInput } from '../ui'
+import { CHANNELS, COMPANIONS, RESULTS, RESULT_COLS, ROLES, cellClass, deliveryLabel, fmtDateTime, resultText, toLocalInput } from '../ui'
 import { usePieces } from '../data/pieces'
 
 interface Draft { visitedAt: string; companion: string | null; generalNote: string; results: Record<string, ResultInput> }
@@ -19,7 +19,7 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
   const [d, setD] = useState<Draft | null>(() => loadDraft(key) ?? (visitId ? null : { visitedAt: toLocalInput(), companion: null, generalNote: '', results: {} }))
   const [dirty, setDirty] = useState(restored)
   const [skipToday, setSkipToday] = useState(false)
-  const [editing, setEditing] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)   // id da fração, ou '*' para todas
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -47,6 +47,20 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
   const savedPerson = (unitId: string) => {
     const i = visitId && f.interactions.find(x => x.visit_id === visitId && x.unit_id === unitId)
     return i ? f.people.find(p => p.id === i.person_id)?.name : undefined
+  }
+  // frações da grelha (as que "Todas as frações" abrange)
+  const gridUnits = b.floors.flatMap(fl => fl.doors.map(door => unitBy.get(unitLabel(fl.label, door)))).filter((u): u is NonNullable<typeof u> => !!u)
+  /** Junta o mesmo resultado a todas as frações da grelha, sem apagar o que já lá estava (soma resultados e entregas). */
+  const applyAll = (r: ResultInput) => {
+    const results = { ...d.results }
+    for (const u of gridUnits) {
+      const cur = results[u.id]
+      results[u.id] = cur
+        ? { ...cur, outcomes: [...new Set([...cur.outcomes, ...r.outcomes])], deliveries: [...(cur.deliveries ?? []), ...(r.deliveries ?? [])], note: cur.note || r.note }
+        : { unitId: u.id, outcomes: [...r.outcomes], deliveries: [...(r.deliveries ?? [])], note: r.note }
+    }
+    change({ ...d, results })
+    flash(`Aplicado a ${gridUnits.length} frações`)
   }
   const today = !visitId && !restored && !skipToday ? f.visits.find(v => v.origin === 'novo' && sameDay(v.visited_at)) : undefined
 
@@ -95,7 +109,10 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
           <input className="t" type="datetime-local" value={d.visitedAt} onChange={e => change({ ...d, visitedAt: e.target.value })} />
         </div>
         <div className="card">
-          <h2>Toca numa fração</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <h2 style={{ margin: 0 }}>Toca numa fração</h2>
+            {gridUnits.length > 1 && <button className="btn sec small" onClick={() => setEditing('*')}>Todas as frações</button>}
+          </div>
           {!b.floors.length && <div className="sub">Este prédio ainda não tem grelha. <a href={`#/p/${id}/editar`}>Definir pisos e frações</a></div>}
           <div className="grid">
             {b.floors.map(fl => (
@@ -120,14 +137,16 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
         {err && <div className="err">{err}</div>}
       </main>
       <div className="fab"><button className="btn" disabled={busy || (!count && !d.generalNote)} onClick={save}>{busy ? 'A gravar…' : `${visitId ? 'Gravar alterações' : 'Gravar visita'}${count ? ` (${count})` : ''}`}</button></div>
-      {editing && <ResultSheet f={f} pieces={pieces} unitId={editing} value={d.results[editing]} onClose={() => setEditing(null)}
+      {editing === '*' && <ResultSheet f={f} pieces={pieces} unitId="*" bulk={gridUnits.length} onClose={() => setEditing(null)}
+        onSave={r => { applyAll(r); setEditing(null) }} />}
+      {editing && editing !== '*' && <ResultSheet f={f} pieces={pieces} unitId={editing} value={d.results[editing]} onClose={() => setEditing(null)}
         onSave={r => { change({ ...d, results: { ...d.results, [editing]: r } }); setEditing(null) }} />}
     </>
   )
 }
 
-function ResultSheet({ f, pieces, unitId, value, onClose, onSave }: { f: BuildingFull; pieces: Piece[]; unitId: string; value?: ResultInput; onClose: () => void; onSave: (r: ResultInput) => void }) {
-  const unit = f.units.find(u => u.id === unitId)!
+function ResultSheet({ f, pieces, unitId, value, bulk, onClose, onSave }: { f: BuildingFull; pieces: Piece[]; unitId: string; value?: ResultInput; bulk?: number; onClose: () => void; onSave: (r: ResultInput) => void }) {
+  const unit = f.units.find(u => u.id === unitId)
   const [outcomes, setOutcomes] = useState<Outcome[]>(value?.outcomes ?? [])
   const [deliveries, setDeliveries] = useState<Delivery[]>(value?.deliveries ?? [])
   const [piece, setPiece] = useState<string | null>(null)
@@ -138,7 +157,7 @@ function ResultSheet({ f, pieces, unitId, value, onClose, onSave }: { f: Buildin
   const [p, setP] = useState(value?.person ?? { name: '', role: 'proprietario' as Role, phone: '', email: '', traits: '', conversation: '' })
   const [otherUnit, setOtherUnit] = useState(value?.otherUnitNote?.unitId ?? '')
   const [otherText, setOtherText] = useState(value?.otherUnitNote?.text ?? '')
-  const talked = outcomes.includes('falei')
+  const talked = !bulk && outcomes.includes('falei')   // em todas as frações não há pessoa nem conversa
   const toggle = (o: Outcome) => { setWarn(''); setOutcomes(x => (x.includes(o) ? x.filter(y => y !== o) : [...x, o])) }
   const noAds = f.building.no_ads === 'sim'
   const active = pieces.filter(x => x.active)
@@ -159,9 +178,14 @@ function ResultSheet({ f, pieces, unitId, value, onClose, onSave }: { f: Buildin
   return (
     <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="panel">
-        <b>{f.building.street}, {f.building.number} · {unit.label}</b>
+        <b>{f.building.street}, {f.building.number} · {bulk ? `Todas as frações (${bulk})` : unit?.label}</b>
+        {!!bulk && <div className="sub">O que escolheres junta-se a cada fração da grelha. O que já marcaste nelas fica.</div>}
         <label className="f">Resultado</label>
-        <div className="opts" style={{ marginTop: 4 }}>{RESULTS.map(([o, l]) => <button key={o} className={'opt' + (outcomes.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>{l}</button>)}</div>
+        <div className="result-cols">
+          {RESULT_COLS.map((col, i) => <div key={i} className="result-col">
+            {col.map(([o, l]) => <button key={o} className={'opt' + (outcomes.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>{l}</button>)}
+          </div>)}
+        </div>
         <label className="f">Deixei <span className="sub">· toca na peça e depois no canal</span></label>
         <div className="deliver">
           <div className="pieces">
@@ -200,8 +224,9 @@ function ResultSheet({ f, pieces, unitId, value, onClose, onSave }: { f: Buildin
         </>}
         <label className="f">Nota da porta</label><input className="t" value={note} onChange={e => setNote(e.target.value)} placeholder="ex.: em obras; nome na caixa: …" />
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button className="btn sec" onClick={() => onSave({ unitId, outcomes: [], deliveries: [], note: '' })}>Limpar</button>
-          <button className="btn" onClick={ok}>OK</button>
+          {bulk ? <button className="btn sec" onClick={onClose}>Cancelar</button>
+            : <button className="btn sec" onClick={() => onSave({ unitId, outcomes: [], deliveries: [], note: '' })}>Limpar</button>}
+          <button className="btn" onClick={ok}>{bulk ? `Aplicar a ${bulk}` : 'OK'}</button>
         </div>
       </div>
     </div>
