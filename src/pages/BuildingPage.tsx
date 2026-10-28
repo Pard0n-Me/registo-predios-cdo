@@ -51,8 +51,10 @@ export default function BuildingPage({ id }: { id: string }) {
   const gridLabels = new Set(b.floors.flatMap(x => x.doors.map(d => unitLabel(x.label, d))))
   const extraUnits = f.units.filter(u => !gridLabels.has(u.label))
 
-  // Um anúncio de venda ativo manda sobre o estado guardado na fração (que pode estar desatualizado).
+  // Um anúncio de venda ativo manda sobre o estado guardado na fração (que pode estar desatualizado),
+  // exceto quando o António marcou à mão Vendido, Arrendado ou Em vigilância.
   const effStatus = (u: Unit) => {
+    if (u.commercial_status === 'vendido' || u.commercial_status === 'arrendado' || u.commercial_status === 'vigilancia') return u.commercial_status
     const l = f.listings.find(x => x.unit_id === u.id && x.active && x.operation === 'venda')
     return l ? (l.advertiser_type === 'particular' ? 'fsbo' : 'fsba') : u.commercial_status
   }

@@ -2,7 +2,7 @@ import { flash } from '../components/Toast'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
-import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, searchPeople, unitLabel, updateUnit } from '../data/store'
+import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, saveUnit, searchPeople, unitLabel } from '../data/store'
 import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '../types'
 import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel } from '../ui'
 import { usePieces } from '../data/pieces'
@@ -22,21 +22,27 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
   const [np, setNp] = useState(EMPTY_P)
   const [matches, setMatches] = useState<Person[]>([])
   const setName = async (name: string) => { setNp(x => ({ ...x, name })); setMatches(name.trim().length >= 2 ? (await searchPeople(name)).slice(0, 3) : []) }
-  const load = () => getBuildingFull(buildingId).then(x => { setF(x); setU(x.units.find(y => y.id === unitId) ?? null) }).catch(e => setErr(e.message))
+  const [origStatus, setOrigStatus] = useState<CommercialStatus | null>(null)
+  const load = () => getBuildingFull(buildingId).then(x => { setF(x); const found = x.units.find(y => y.id === unitId) ?? null; setU(found); setOrigStatus(found?.commercial_status ?? null) }).catch(e => setErr(e.message))
   useEffect(() => { load() }, [buildingId, unitId]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!f || !u) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
 
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => { setU({ ...u, [k]: v }); setDirty(true) }
   const save = async () => {
     try {
-      await updateUnit(u.id, { typology: u.typology, area_m2: u.area_m2, condition: u.condition, commercial_status: u.commercial_status, pipedrive_deal_id: u.pipedrive_deal_id, notes: u.notes })
-      setDirty(false); flash('Fração gravada')
+      // o estado comercial só vai quando mudou: é isso que decide retirar os anúncios ativos
+      const { retired } = await saveUnit(u.id, { typology: u.typology, area_m2: u.area_m2, condition: u.condition, pipedrive_deal_id: u.pipedrive_deal_id, notes: u.notes, ...(u.commercial_status !== origStatus ? { commercial_status: u.commercial_status } : {}) })
+      setOrigStatus(u.commercial_status)
+      setDirty(false); flash(retired ? `Fração gravada · ${retired === 1 ? 'anúncio retirado' : retired + ' anúncios retirados'}` : 'Fração gravada')
+      if (retired) load()
     } catch (e) { setErr((e as Error).message) }
   }
   const addNote = async () => { if (!note.trim()) return; await addUnitNote(u.id, note.trim(), null); setNote(''); load() }
 
   const people = f.personUnits.filter(pu => pu.unit_id === u.id).map(pu => ({ pu, p: f.people.find(p => p.id === pu.person_id) })).filter(x => x.p)
   const listings = f.listings.filter(l => l.unit_id === u.id)
+  // anúncios que a gravação vai retirar (estado comercial deixou de ser FSBO/FSBA)
+  const retiring = u.commercial_status !== origStatus && u.commercial_status !== 'fsbo' && u.commercial_status !== 'fsba' ? listings.filter(l => l.active && l.operation === 'venda') : []
   const history = f.visits.map(v => ({ v, r: f.results.find(r => r.visit_id === v.id && r.unit_id === u.id) })).filter(x => x.r)
   const notes = f.unitNotes.filter(n => n.unit_id === u.id).sort((a, b) => b.at.localeCompare(a.at))
   const gridLabels = f.building.floors.flatMap(fl => fl.doors.map(d => unitLabel(fl.label, d)))
@@ -96,7 +102,10 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           </div>
           <label className="f">Negócio no Pipedrive (ID)</label><input className="t" inputMode="numeric" value={u.pipedrive_deal_id ?? ''} onChange={e => set('pipedrive_deal_id', e.target.value ? +e.target.value : null)} />
           <label className="f">Notas</label><textarea className="t" value={u.notes ?? ''} onChange={e => set('notes', e.target.value || null)} />
-          {dirty && <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={save}>Gravar fração</button>}
+          {dirty && retiring.length > 0 && <div className="note" style={{ marginTop: 10 }}>
+            Ao gravar, {retiring.length === 1 ? 'o anúncio de venda ativo passa' : `os ${retiring.length} anúncios de venda ativos passam`} a <b>retirado</b> ({retiring.map(l => l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser || 'agência').join(', ')}). Sem isso, a grelha continuava a mostrar "à venda".
+          </div>}
+          {dirty && <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={save}>{retiring.length ? 'Gravar e retirar anúncio' : 'Gravar fração'}</button>}
           {err && <div className="err">{err}</div>}
         </div>
 

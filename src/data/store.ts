@@ -204,6 +204,20 @@ export async function deleteEmptyUnit(id: string) {
 }
 
 export async function updateUnit(id: string, patch: Partial<Unit>) { return db.update<Unit>('units', id, patch) }
+/** Anúncios de venda ativos da fração (os que a pintam de FSBO/FSBA na grelha). */
+export async function activeSaleListings(unitId: string) {
+  return (await db.where<Listing>('listings', 'unit_id', unitId)).filter(x => x.active && x.operation === 'venda')
+}
+/** Grava a fração. Se o estado comercial deixa de ser FSBO/FSBA, retira os anúncios de venda ativos,
+ *  senão a grelha continuava a mostrar "FSBO ativo" (o anúncio ativo manda na célula). */
+export async function saveUnit(id: string, patch: Partial<Unit>): Promise<{ retired: number }> {
+  await db.update<Unit>('units', id, patch)
+  let retired = 0
+  if (patch.commercial_status && patch.commercial_status !== 'fsbo' && patch.commercial_status !== 'fsba') {
+    for (const l of await activeSaleListings(id)) { await db.update('listings', l.id, { active: false }); retired++ }
+  }
+  return { retired }
+}
 /** Cria uma pessoa sem fração (ex.: contacto de um anúncio com andar incerto). */
 export async function createPerson(p: { name: string; phone?: string; email?: string; traits?: string; notes?: string }) {
   return (await db.insert<Person>('people', {
