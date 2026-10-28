@@ -97,18 +97,6 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
           </div>
         </div>}
         <div className="card">
-          <h2>Acompanhante</h2>
-          <div className="seg">
-            <button className={'chip' + (d.companion === null ? ' on' : '')} onClick={() => change({ ...d, companion: null })}>Sozinho</button>
-            {COMPANIONS.map(c => <button key={c} className={'chip' + (d.companion === c ? ' on' : '')} onClick={() => change({ ...d, companion: c })}>{c}</button>)}
-            {other || (d.companion && !COMPANIONS.includes(d.companion))
-              ? <input className="t" style={{ width: 140 }} placeholder="Nome" value={d.companion && !COMPANIONS.includes(d.companion) ? d.companion : other} onChange={e => { setOther(e.target.value); change({ ...d, companion: e.target.value || null }) }} />
-              : <button className="chip" onClick={() => setOther(' ')}>+ outro</button>}
-          </div>
-          <label className="f">Data e hora</label>
-          <input className="t" type="datetime-local" value={d.visitedAt} onChange={e => change({ ...d, visitedAt: e.target.value })} />
-        </div>
-        <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <h2 style={{ margin: 0 }}>Toca numa fração</h2>
             {gridUnits.length > 1 && <button className="btn sec small" onClick={() => setEditing('*')}>Todas as frações</button>}
@@ -129,6 +117,18 @@ export default function VisitPage({ id, visitId }: { id: string; visitId?: strin
               </div>
             ))}
           </div>
+        </div>
+        <div className="card">
+          <h2>Acompanhante</h2>
+          <div className="seg">
+            <button className={'chip' + (d.companion === null ? ' on' : '')} onClick={() => change({ ...d, companion: null })}>Sozinho</button>
+            {COMPANIONS.map(c => <button key={c} className={'chip' + (d.companion === c ? ' on' : '')} onClick={() => change({ ...d, companion: c })}>{c}</button>)}
+            {other || (d.companion && !COMPANIONS.includes(d.companion))
+              ? <input className="t" style={{ width: 140 }} placeholder="Nome" value={d.companion && !COMPANIONS.includes(d.companion) ? d.companion : other} onChange={e => { setOther(e.target.value); change({ ...d, companion: e.target.value || null }) }} />
+              : <button className="chip" onClick={() => setOther(' ')}>+ outro</button>}
+          </div>
+          <label className="f">Data e hora</label>
+          <input className="t" type="datetime-local" value={d.visitedAt} onChange={e => change({ ...d, visitedAt: e.target.value })} />
         </div>
         <div className="card">
           <h2>Nota geral</h2>
