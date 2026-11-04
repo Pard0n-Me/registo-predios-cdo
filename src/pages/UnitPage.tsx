@@ -7,6 +7,7 @@ import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '.
 import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, listingState, resultText, roleLabel } from '../ui'
 import { usePieces } from '../data/pieces'
 import { Detail } from './BuildingPage'
+import { fetchDeal, statusPt, type DealResult } from '../data/pipedrive'
 import type { Listing } from '../types'
 
 export default function UnitPage({ buildingId, unitId }: { buildingId: string; unitId: string }) {
@@ -104,6 +105,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
             <div><label className="f">Estado comercial</label><select className="t" value={u.commercial_status} onChange={e => set('commercial_status', e.target.value as CommercialStatus)}>{STATUS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></div>
           </div>
           <label className="f">Negócio no Pipedrive (ID)</label><input className="t" inputMode="numeric" value={u.pipedrive_deal_id ?? ''} onChange={e => set('pipedrive_deal_id', e.target.value ? +e.target.value : null)} />
+          {u.pipedrive_deal_id != null && !dirty && <DealStage id={u.pipedrive_deal_id} />}
           <label className="f">Notas</label><textarea className="t" value={u.notes ?? ''} onChange={e => set('notes', e.target.value || null)} />
           {dirty && retiring.length > 0 && <div className="note" style={{ marginTop: 10 }}>
             Ao gravar, {retiring.length === 1 ? 'o anúncio de venda ativo passa' : `os ${retiring.length} anúncios de venda ativos passam`} a <b>retirado</b> ({retiring.map(l => l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser || 'agência').join(', ')}). Sem isso, a grelha continuava a mostrar "à venda".
@@ -184,4 +186,17 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
         onDeleted={() => { setF({ ...f, listings: f.listings.filter(x => x.id !== openListing.id) }); setOpenListing(null) }} onSettled={load} />}
     </>
   )
+}
+
+/** Etapa do negócio no Pipedrive (só leitura; escrever no Pipedrive é só pelo Claude Code). */
+function DealStage({ id }: { id: number }) {
+  const [r, setR] = useState<DealResult | null>(null)
+  useEffect(() => { let on = true; setR(null); fetchDeal(id).then(x => on && setR(x)); return () => { on = false } }, [id])
+  const link = <a href={`https://app.pipedrive.com/deal/${id}`} target="_blank" rel="noreferrer">Abrir no Pipedrive ↗</a>
+  return <div className="sub" style={{ marginTop: 6 }}>
+    {!r ? 'A ler a etapa no Pipedrive…'
+      : r.ok ? <><b style={{ color: 'var(--ink)' }}>{r.deal.stage ?? 'Etapa ?'}</b> · {statusPt(r.deal.status)}{r.deal.pipeline_id !== 18 ? ` · funil ${r.deal.pipeline_id}` : ''}<br />{r.deal.title}</>
+      : r.msg}
+    {' '}{link}
+  </div>
 }
