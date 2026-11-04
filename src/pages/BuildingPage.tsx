@@ -38,6 +38,7 @@ export default function BuildingPage({ id }: { id: string }) {
   const [open, setOpen] = useState<Ev | null>(null)
   const [moving, setMoving] = useState(false)
   const [posMsg, setPosMsg] = useState('')
+  const [showChars, setShowChars] = useState(false)
   useEffect(() => { getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }, [id])
   if (err) return <main><div className="err">{err}</div></main>
   if (!f) return <main><div className="sub" style={{ padding: 20 }}>A carregar…</div></main>
@@ -79,19 +80,9 @@ export default function BuildingPage({ id }: { id: string }) {
       <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Mapa</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
       <main>
         <div className="card">
-          <div className="sub">{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>
-          {(() => {
-            const all = chips(b), known = all.filter(([, c]) => c !== 'q'), unknown = all.length - known.length
-            return <div className="chips" style={{ marginTop: 10 }}>
-              {known.map(([t, c]) => <span key={t} className={'chip ' + c}>{t}</span>)}
-              {unknown > 0 && <button className="chip q" onClick={() => go(`/p/${id}/editar`)}>+ {unknown} por preencher</button>}
-            </div>
-          })()}
-          {(b.condo_admin || b.notes) && <div className="note">{b.condo_admin ? `Administração: ${b.condo_admin}\n` : ''}{b.notes ?? ''}</div>}
-        </div>
-
-        <div className="card">
           <h2>Frações · último resultado</h2>
+          <div className="sub" style={{ marginTop: -4, marginBottom: 8 }}>{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>
+          {b.no_ads === 'sim' && <div className="chips" style={{ marginBottom: 8 }}><span className="chip warn">Publicidade não</span></div>}
           {!b.floors.length && <div className="sub">Grelha por definir. <a href={`#/p/${id}/editar`}>Definir pisos e frações</a></div>}
           <div className="grid">
             {b.floors.map(fl => (
@@ -121,6 +112,37 @@ export default function BuildingPage({ id }: { id: string }) {
         </div>
 
         <div className="card">
+          <h2>Histórico</h2>
+          {!events.length && <div className="sub">Ainda nada.</div>}
+          {events.map(e => (
+            <div className="ev" key={(e.kind === 'visit' ? e.v.id : e.l.id)} onClick={() => setOpen(e)}>
+              <div className="d">{e.kind === 'visit' ? fmtDate(e.v.visited_at, e.v.year_uncertain) : fmtDate(e.l.first_seen, e.l.first_seen_uncertain)}</div>
+              <div>{e.kind === 'visit' ? visitLine(e.v, f) : listingLine(e.l, f)}</div>
+              <div className="sub">›</div>
+            </div>
+          ))}
+        </div>
+        <div className="card">
+          {(() => {
+            const all = chips(b), known = all.filter(([, c]) => c !== 'q'), unknown = all.length - known.length
+            const hasNotes = !!(b.condo_admin || b.notes)
+            return <>
+              <button className="fold" aria-expanded={showChars} onClick={() => setShowChars(x => !x)}>
+                <h2 style={{ margin: 0 }}>Características</h2>
+                <span className="sub" style={{ whiteSpace: 'nowrap' }}>{known.length} de {all.length}{hasNotes ? ' · notas' : ''} <span aria-hidden="true">{showChars ? '▴' : '▾'}</span></span>
+              </button>
+              {showChars && <>
+                <div className="chips" style={{ marginTop: 10 }}>
+                  {known.map(([t, c]) => <span key={t} className={'chip ' + c}>{t}</span>)}
+                  {unknown > 0 && <button className="chip q" onClick={() => go(`/p/${id}/editar`)}>+ {unknown} por preencher</button>}
+                </div>
+                {hasNotes && <div className="note">{b.condo_admin ? `Administração: ${b.condo_admin}\n` : ''}{b.notes ?? ''}</div>}
+              </>}
+            </>
+          })()}
+        </div>
+
+        <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <h2 style={{ margin: 0 }}>Localização</h2>
             {b.lat != null
@@ -143,17 +165,6 @@ export default function BuildingPage({ id }: { id: string }) {
           {b.lat == null && !posMsg && <div className="sub" style={{ marginTop: 6 }}>Sem posição: este prédio não aparece no mapa.</div>}
         </div>
 
-        <div className="card">
-          <h2>Histórico</h2>
-          {!events.length && <div className="sub">Ainda nada.</div>}
-          {events.map(e => (
-            <div className="ev" key={(e.kind === 'visit' ? e.v.id : e.l.id)} onClick={() => setOpen(e)}>
-              <div className="d">{e.kind === 'visit' ? fmtDate(e.v.visited_at, e.v.year_uncertain) : fmtDate(e.l.first_seen, e.l.first_seen_uncertain)}</div>
-              <div>{e.kind === 'visit' ? visitLine(e.v, f) : listingLine(e.l, f)}</div>
-              <div className="sub">›</div>
-            </div>
-          ))}
-        </div>
       </main>
       <div className="fab">
         <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>

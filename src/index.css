@@ -164,3 +164,5 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 .pthumb{width:56px;height:56px;object-fit:cover;border-radius:10px;background:var(--grey-soft);flex:none}
 .result-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .result-col{display:flex;flex-direction:column;gap:8px}
+/* Secção que abre ao tocar (ficha do prédio › Características) */
+.fold{display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;min-height:32px}
