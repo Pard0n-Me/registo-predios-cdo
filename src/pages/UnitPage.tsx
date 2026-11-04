@@ -181,7 +181,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
         </div>
       </main>
       {openListing && <Detail ev={{ kind: 'listing', at: openListing.first_seen, l: openListing }} f={f} pieces={pieces} onClose={() => setOpenListing(null)}
-        onDeleted={() => { flash('Anúncio apagado'); setOpenListing(null); load() }} />}
+        onDeleted={() => { setF({ ...f, listings: f.listings.filter(x => x.id !== openListing.id) }); setOpenListing(null) }} onSettled={load} />}
     </>
   )
 }

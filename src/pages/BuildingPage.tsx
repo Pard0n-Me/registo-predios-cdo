@@ -1,4 +1,4 @@
-import { flash } from '../components/Toast'
+import { deleteWithUndo } from '../components/Toast'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
@@ -170,9 +170,18 @@ export default function BuildingPage({ id }: { id: string }) {
         <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
         <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
       </div>
-      {open && <Detail ev={open} f={f} pieces={pieces} onClose={() => setOpen(null)} onDeleted={() => { flash(open.kind === 'visit' ? 'Visita apagada' : 'Anúncio apagado'); setOpen(null); getBuildingFull(id).then(setF).catch(e => setErr(e.message)) }} />}
+      {open && <Detail ev={open} f={f} pieces={pieces} onClose={() => setOpen(null)}
+        onDeleted={() => { setF(withoutEv(f, open)); setOpen(null) }}
+        onSettled={() => getBuildingFull(id).then(setF).catch(e => setErr(e.message))} />}
     </>
   )
+}
+
+/** A ficha sem a visita ou o anúncio que se acabou de apagar (enquanto o "Anular" está no ecrã). */
+export function withoutEv(f: BuildingFull, ev: Ev): BuildingFull {
+  return ev.kind === 'visit'
+    ? { ...f, visits: f.visits.filter(v => v.id !== ev.v.id), results: f.results.filter(r => r.visit_id !== ev.v.id) }
+    : { ...f, listings: f.listings.filter(l => l.id !== ev.l.id), prices: f.prices.filter(p => p.listing_id !== ev.l.id) }
 }
 
 function visitLine(v: Visit, f: BuildingFull) {
@@ -190,20 +199,18 @@ function listingLine(l: Listing, f: BuildingFull) {
 }
 
 /** Resumo de uma visita ou de um anúncio (folha de baixo). Usado no histórico do prédio e na ficha da fração. */
-export function Detail({ ev, f, pieces, onClose, onDeleted }: { ev: Ev; f: BuildingFull; pieces: Piece[]; onClose: () => void; onDeleted: () => void }) {
+/**
+ * onDeleted: esconder já o que se apagou (a base só apaga passados uns segundos, com "Anular" no aviso).
+ * onSettled: recarregar quando o apagar se concretiza ou é anulado.
+ */
+export function Detail({ ev, f, pieces, onClose, onDeleted, onSettled }: { ev: Ev; f: BuildingFull; pieces: Piece[]; onClose: () => void; onDeleted: () => void; onSettled: () => void }) {
   const bid = f.building.id
-  const [confirm, setConfirm] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [delErr, setDelErr] = useState('')
-  const remove = async () => {
-    setBusy(true); setDelErr('')
-    try { if (ev.kind === 'visit') await deleteVisit(ev.v.id); else await deleteListing(ev.l); onDeleted() }
-    catch (e) { setDelErr('Não apagou: ' + (e as Error).message); setBusy(false) }
+  const remove = () => {
+    deleteWithUndo(ev.kind === 'visit' ? 'Visita apagada' : 'Anúncio apagado',
+      () => ev.kind === 'visit' ? deleteVisit(ev.v.id) : deleteListing(ev.l), () => onSettled())
+    onDeleted()
   }
   const what = ev.kind === 'visit' ? 'esta visita' : 'este anúncio'
-  const consequence = ev.kind === 'visit'
-    ? 'Os resultados por fração desta visita desaparecem. As pessoas e as conversas ficam, sem ligação à visita.'
-    : 'O anúncio e o histórico de preços desaparecem.'
   let body
   if (ev.kind === 'visit') {
     const v = ev.v
@@ -264,16 +271,10 @@ export function Detail({ ev, f, pieces, onClose, onDeleted }: { ev: Ev; f: Build
   return <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>
     <div className="panel">{body}
       <button className="btn" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>Fechar</button>
-      {!confirm
-        ? <button className="linkbtn" style={{ color: 'var(--bad)', marginTop: 12 }} onClick={() => setConfirm(true)}>Apagar {what}</button>
-        : <div className="note" style={{ marginTop: 12 }}>
-            <b>Apagar {what} de vez?</b> {consequence}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="btn sec" disabled={busy} onClick={() => setConfirm(false)}>Cancelar</button>
-              <button className="btn" style={{ background: 'var(--bad)' }} disabled={busy} onClick={remove}>{busy ? 'A apagar…' : 'Apagar'}</button>
-            </div>
-          </div>}
-      {delErr && <div className="err">{delErr}</div>}
+      <button className="linkbtn" style={{ color: 'var(--bad)', marginTop: 12 }} onClick={remove}>Apagar {what}</button>
+      <div className="sub" style={{ marginTop: 4 }}>{ev.kind === 'visit'
+        ? 'Leva os resultados por fração desta visita; pessoas e conversas ficam. Há uns segundos para anular.'
+        : 'Leva o histórico de preços. Há uns segundos para anular.'}</div>
     </div>
   </div>
 }
