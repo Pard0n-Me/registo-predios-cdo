@@ -40,3 +40,10 @@ cp .env.example .env.local   # e preenche as duas variáveis
 npm install
 npm run dev
 ```
+
+## 5. Pipedrive na app (só leitura, opcional — decisão de 04/11)
+A ficha da fração mostra a etapa do negócio quando tem "Negócio no Pipedrive (ID)". A app **não escreve** no Pipedrive (só o Claude Code escreve).
+1. Pipedrive › (o teu nome) › **Preferências pessoais › API** › copia o token pessoal. Não o envies ao Claude.
+2. Vercel › projeto `registo-predios-cdo` › **Settings › Environment Variables** › `PIPEDRIVE_API_TOKEN` = o token (Production). **Sem** o prefixo `VITE_`: assim fica só no servidor e nunca chega ao telefone.
+3. **Deployments › Redeploy** (as variáveis só entram num deploy novo).
+Atenção: o token do Pipedrive dá acesso total à tua conta. A função `api/pipedrive-deal.ts` só faz leituras e só responde a quem tem sessão iniciada na app.
