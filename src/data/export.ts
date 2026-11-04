@@ -1,7 +1,7 @@
 // Exportação para Excel: CSV com ";" e BOM (abre direito no Excel em português).
 import { db } from './adapter'
 import type { Building, Interaction, Listing, ListingPrice, Person, PersonUnit, Unit, Visit, VisitResult } from '../types'
-import { condLabel, fmtDate, resultText, roleLabel, statusLabel } from '../ui'
+import { condLabel, fmtDate, listingState, resultText, roleLabel, statusLabel } from '../ui'
 import { getPieces } from './pieces'
 
 const cell = (v: unknown) => {
@@ -68,7 +68,7 @@ export async function buildExports() {
     const ps = prices.filter(p => p.listing_id === l.id).sort((a, c) => a.at.localeCompare(c.at))
     return [b?.street, b?.number, l.unit_id ? uById.get(l.unit_id)?.label : l.floor_hint, l.operation, fmtDate(l.first_seen, l.first_seen_uncertain), l.typology, l.area_m2,
       l.advertiser_type === 'particular' ? 'Particular (FSBO)' : l.advertiser, l.exclusivity, lastPrice(l), ps.map(p => `${iso(p.at)}: ${p.price}`).join(' | '),
-      l.active ? 'Ativo' : 'Retirado', l.source, l.url, l.notes,
+      listingState(l), l.source, l.url, l.notes,
       (() => { const c = l.contact_person_id ? pById.get(l.contact_person_id) : null; return c ? [c.name, c.phone, c.email].filter(Boolean).join(' · ') : '' })()]
   })
   const anuncios = csv(['Rua', 'Nº', 'Fração / andar', 'Operação', 'Visto', 'Tipologia', 'Área m²', 'Anunciante', 'Exclusividade', 'Preço atual', 'Histórico de preços', 'Estado', 'Fonte', 'Link', 'Notas', 'Contacto'], an)

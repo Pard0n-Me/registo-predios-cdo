@@ -4,7 +4,7 @@ import Reload from '../components/Reload'
 import { useEffect, useState } from 'react'
 import { addPersonToUnit, addUnitNote, deleteEmptyUnit, getBuildingFull, mergeUnit, saveUnit, searchPeople, unitLabel } from '../data/store'
 import type { BuildingFull, CommercialStatus, Cond, Person, Role, Unit } from '../types'
-import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel } from '../ui'
+import { COND, ROLES, STATUS, fmtDate, fmtDateTime, fmtPrice, go, listingState, resultText, roleLabel } from '../ui'
 import { usePieces } from '../data/pieces'
 import { Detail } from './BuildingPage'
 import type { Listing } from '../types'
@@ -158,7 +158,7 @@ export default function UnitPage({ buildingId, unitId }: { buildingId: string; u
           {listings.map(l => {
             const p = f.prices.filter(x => x.listing_id === l.id).sort((a, b) => b.at.localeCompare(a.at))[0]
             return <div key={l.id} className="row click" onClick={() => setOpenListing(l)}>
-              <div>{fmtDate(l.first_seen, l.first_seen_uncertain)} · {l.operation} · {l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser ?? '?'}{p ? ` · ${fmtPrice(p.price)}` : ''}<div className="sub">{l.active ? 'ativo' : 'retirado'}{(() => { const c = f.people.find(x => x.id === l.contact_person_id); return c ? ` · contacto: ${c.name}${c.phone ? ' ' + c.phone : ''}` : '' })()}</div></div>›
+              <div>{fmtDate(l.first_seen, l.first_seen_uncertain)} · {l.operation} · {l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser ?? '?'}{p ? ` · ${fmtPrice(p.price)}` : ''}<div className="sub">{listingState(l).toLowerCase()}{(() => { const c = f.people.find(x => x.id === l.contact_person_id); return c ? ` · contacto: ${c.name}${c.phone ? ' ' + c.phone : ''}` : '' })()}</div></div>›
             </div>
           })}
           <button className="linkbtn" onClick={() => go(`/p/${buildingId}/anuncio?unit=${u.id}`)}>+ anúncio nesta fração</button>

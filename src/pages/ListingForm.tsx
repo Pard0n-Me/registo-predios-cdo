@@ -13,6 +13,7 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
     advertiser_type: '?', active: true, source: null,
   })
   const [price, setPrice] = useState('')
+  const [soldPrice, setSoldPrice] = useState('')
   const [priceAt, setPriceAt] = useState(today())
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -22,7 +23,7 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
   useEffect(() => {
     getBuildingFull(buildingId).then(x => {
       setF(x)
-      if (listingId) { const found = x.listings.find(y => y.id === listingId); if (found) { setL(found); setContact(found.contact_person_id ?? '') } }
+      if (listingId) { const found = x.listings.find(y => y.id === listingId); if (found) { setL(found); setContact(found.contact_person_id ?? ''); setSoldPrice(found.sold_price ? String(found.sold_price) : '') } }
     }).catch(e => setErr(e.message))
   }, [buildingId, listingId])
   if (!f) return <main>{err ? <div className="err">{err}</div> : <div className="sub" style={{ padding: 20 }}>A carregar…</div>}</main>
@@ -46,12 +47,18 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
       const { condition, ...rest } = l
       const had = listingId ? f.listings.find(x => x.id === listingId)?.condition : null
       const withCond = (condition && condition !== '?') || had ? { condition: condition ?? null } : {}
-      const { kept } = await saveListing({ ...rest, ...withContact, ...withCond, building_id: buildingId, price: p, price_at: listingId ? priceAt : l.first_seen })
+      // vendido: as colunas são de 04/11; só vão quando o anúncio está ou esteve vendido
+      const { sold, sold_at, sold_price, ...rest2 } = rest
+      const wasSold = listingId ? !!f.listings.find(x => x.id === listingId)?.sold : false
+      const sp = soldPrice ? +soldPrice.replace(/[^\d]/g, '') : null
+      const withSold = sold ? { sold: true, active: false, sold_at: sold_at || null, sold_price: sp } : wasSold ? { sold: false, sold_at: null, sold_price: null } : {}
+      const { kept } = await saveListing({ ...rest2, ...withContact, ...withCond, ...withSold, building_id: buildingId, price: p, price_at: listingId ? priceAt : l.first_seen })
       flash((listingId ? 'Anúncio atualizado' : 'Anúncio gravado') + (kept.length ? ` · a fração mantém ${kept.join(', ')}` : ''))
       location.replace(`#/p/${buildingId}`)
     } catch (e) {
       const m = (e as Error).message
       setErr(/contact_person_id/.test(m) ? 'Falta acrescentar a coluna do contacto na Supabase: corre o ficheiro supabase/migracoes/2026-10-20-contacto-anuncio.sql no SQL Editor.'
+        : /sold/.test(m) ? 'Falta acrescentar as colunas do "vendido" na Supabase: corre o ficheiro supabase/migracoes/2026-11-04-anuncio-vendido.sql no SQL Editor.'
         : /condition/.test(m) ? 'Falta acrescentar a coluna do estado na Supabase: corre o ficheiro supabase/migracoes/2026-10-21-estado-anuncio.sql no SQL Editor. (Sem estado escolhido, grava na mesma.)' : m)
     } finally { setBusy(false) }
   }
@@ -116,9 +123,14 @@ export default function ListingForm({ buildingId, listingId, unitId }: { buildin
           </div>
           <datalist id="fontes">{['radar', 'idealista', 'imovirtual', 'casa sapo', 'maxwork', 'placa na rua', 'vizinho'].map(s => <option key={s} value={s} />)}</datalist>
           <label className="f">Notas</label><textarea className="t" value={l.notes ?? ''} onChange={e => set('notes', e.target.value || null)} />
-          {listingId && <div className="seg" style={{ marginTop: 10 }}>
-            <button className={'chip' + (l.active ? ' on' : '')} onClick={() => set('active', true)}>Ativo</button>
-            <button className={'chip' + (!l.active ? ' on' : '')} onClick={() => set('active', false)}>Retirado</button>
+          {listingId && <><label className="f">Estado do anúncio</label><div className="seg">
+            <button className={'chip' + (l.active && !l.sold ? ' on' : '')} onClick={() => setL(x => ({ ...x, active: true, sold: false }))}>Ativo</button>
+            <button className={'chip' + (!l.active && !l.sold ? ' on' : '')} onClick={() => setL(x => ({ ...x, active: false, sold: false }))}>Retirado</button>
+            {l.operation === 'venda' && <button className={'chip' + (l.sold ? ' on' : '')} onClick={() => setL(x => ({ ...x, active: false, sold: true }))}>Vendido</button>}
+          </div></>}
+          {l.sold && <div className="two">
+            <div><label className="f" htmlFor="sold-at">Vendido em (mês)</label><input id="sold-at" className="t" type="month" value={l.sold_at?.slice(0, 7) ?? ''} onChange={e => set('sold_at', e.target.value ? e.target.value + '-01' : null)} /></div>
+            <div><label className="f" htmlFor="sold-price">Valor de venda (€)</label><input id="sold-price" className="t" inputMode="numeric" value={soldPrice} placeholder="se se souber" onChange={e => setSoldPrice(e.target.value)} /></div>
           </div>}
         </div>
         <div className="card">

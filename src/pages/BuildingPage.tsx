@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
 import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
-import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, resultText, roleLabel, statusLabel } from '../ui'
+import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, listingState, resultText, roleLabel, statusLabel } from '../ui'
 import { usePieces } from '../data/pieces'
 import type { Piece } from '../types'
 
@@ -195,7 +195,7 @@ function listingLine(l: Listing, f: BuildingFull) {
   const u = f.units.find(x => x.id === l.unit_id)
   const p = f.prices.filter(x => x.listing_id === l.id).sort((a, b) => b.at.localeCompare(a.at))[0]
   const who = l.advertiser_type === 'particular' ? 'FSBO' : l.advertiser || (l.advertiser_type === '?' ? 'anunciante ?' : l.advertiser_type)
-  return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · retirado</span>}</>
+  return <>Anúncio {l.operation === 'arrendamento' ? 'arrend.' : 'venda'} · {u?.label ?? l.floor_hint ?? 'andar ?'}{l.typology ? ` · ${l.typology}` : ''}{p ? ` · ${fmtPrice(p.price)}` : ''} · {who}{!l.active && <span className="sub"> · {listingState(l).toLowerCase()}</span>}</>
 }
 
 /** Resumo de uma visita ou de um anúncio (folha de baixo). Usado no histórico do prédio e na ficha da fração. */
@@ -251,7 +251,7 @@ export function Detail({ ev, f, pieces, onClose, onDeleted, onSettled }: { ev: E
       ['Tipologia · área', `${l.typology ?? '?'} · ${l.area_m2 ? l.area_m2 + ' m²' : '?'}`],
       ['Estado de conservação', l.condition ? condLabel(l.condition) : '?'],
       ['Anunciante', l.advertiser_type === 'particular' ? 'Particular (FSBO)' : `${l.advertiser ?? '?'}${l.advertiser_type !== '?' ? ` (${l.advertiser_type})` : ''}`],
-      ['Exclusividade', l.exclusivity ?? '?'], ['Fonte', l.source ?? '?'], ['Estado', l.active ? 'Ativo' : 'Retirado'],
+      ['Exclusividade', l.exclusivity ?? '?'], ['Fonte', l.source ?? '?'], ['Estado', listingState(l)],
     ]
     body = <>
       <b>Anúncio · {fmtDate(l.first_seen, l.first_seen_uncertain)}</b>
@@ -265,7 +265,7 @@ export function Detail({ ev, f, pieces, onClose, onDeleted, onSettled }: { ev: E
       {!prices.length && <div className="sub">Sem preço registado.</div>}
       {l.notes && <div className="note">{l.notes}</div>}
       {l.url && <div style={{ marginTop: 10 }}><a href={l.url} target="_blank" rel="noreferrer">Abrir anúncio ↗</a></div>}
-      <button className="btn sec" style={{ width: '100%', marginTop: 12 }} onClick={() => go(`/p/${bid}/anuncio/${l.id}`)}>Editar · novo preço · retirar</button>
+      <button className="btn sec" style={{ width: '100%', marginTop: 12 }} onClick={() => go(`/p/${bid}/anuncio/${l.id}`)}>Editar · novo preço · retirar · vendido</button>
     </>
   }
   return <div className="sheet" onClick={e => e.target === e.currentTarget && onClose()}>

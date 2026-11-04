@@ -140,6 +140,10 @@ export interface Listing {
   contact_person_id?: string | null
   /** Estado de conservação dito no anúncio. Coluna acrescentada a 21/10. */
   condition?: Cond | null
+  /** Vendido (com active = false). Colunas acrescentadas a 04/11; sold_at é o dia 1 do mês da venda. */
+  sold?: boolean
+  sold_at?: string | null
+  sold_price?: number | null
   created_at?: string
 }
 

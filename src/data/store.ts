@@ -286,6 +286,7 @@ export async function saveListing(l: ListingInput): Promise<{ listing: Listing; 
     const want = active.length ? (active.some(x => x.advertiser_type === 'particular') ? 'fsbo' : 'fsba') : null
     if (u && want && u.commercial_status !== want && (u.commercial_status === 'nada' || u.commercial_status === 'fsbo' || u.commercial_status === 'fsba'))
       await db.update('units', u.id, { commercial_status: want })
+    // (Um anúncio vendido não muda a fração para "Vendido": esse estado é posto à mão e mandaria sobre anúncios futuros.)
     if (u && !want && (u.commercial_status === 'fsbo' || u.commercial_status === 'fsba')) await db.update('units', u.id, { commercial_status: 'nada' })
   }
   return { listing: saved, kept }

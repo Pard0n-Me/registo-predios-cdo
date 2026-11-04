@@ -57,6 +57,13 @@ export function fmtDateTime(iso: string): string {
   const d = new Date(iso)
   return `${fmtDate(iso)} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+/** "01/2024" a partir de "2024-01-01". */
+export const fmtMonth = (iso: string | null | undefined) => iso ? `${iso.slice(5, 7)}/${iso.slice(0, 4)}` : ''
+/** Estado do anúncio para mostrar: Ativo, Retirado ou "Vendido 01/2024 · 1 125 000 €". */
+export function listingState(l: { active: boolean; sold?: boolean; sold_at?: string | null; sold_price?: number | null }) {
+  if (l.sold) return ['Vendido', fmtMonth(l.sold_at), l.sold_price ? fmtPrice(l.sold_price) : ''].filter(Boolean).join(' · ')
+  return l.active ? 'Ativo' : 'Retirado'
+}
 export const fmtPrice = (n: number) => n.toLocaleString('pt-PT', { maximumFractionDigits: 0 }) + ' €'
 
 /** Valor para <input type="datetime-local"> na hora local. */
