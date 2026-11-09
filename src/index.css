@@ -245,3 +245,5 @@ header.top h1.wrap2{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;
 .unit.r-venda{min-height:72px}
 .unit-ad{font-weight:700;font-variant-numeric:tabular-nums}
 .emptybox{display:grid;gap:10px;justify-items:start;margin:4px 0 6px}
+.maptop .results .brow{box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.maptop .results .card{margin:0 0 8px}
