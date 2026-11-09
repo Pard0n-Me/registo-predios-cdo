@@ -9,6 +9,13 @@ const PATHS: Record<string, string> = {
   refresh: 'M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5',
   x: 'M18 6 6 18M6 6l12 12',
   check: 'M20 6 9 17l-5-5',
+  map: 'M9 4 3 6.5v13L9 17l6 3 6-2.5v-13L15 7 9 4zM9 4v13M15 7v13',
+  list: 'M8 6h13M8 12h13M8 18h13M3.8 6h.01M3.8 12h.01M3.8 18h.01',
+  tag: 'M3 12V4h8l10 10-8 8L3 12zM7.5 8.5h.01',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  minus: 'M5 12h14',
 }
 
 export default function Icon({ name, size = 18 }: { name: keyof typeof PATHS; size?: number }) {
