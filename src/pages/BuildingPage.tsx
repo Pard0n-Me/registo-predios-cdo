@@ -158,7 +158,7 @@ export default function BuildingPage({ id }: { id: string }) {
             return <>
               <button className="fold" aria-expanded={showChars} onClick={() => setShowChars(x => !x)}>
                 <h2 style={{ margin: 0 }}>Características</h2>
-                <span className="sub" style={{ whiteSpace: 'nowrap' }}>{known.length} preenchidas{hasNotes ? ' · notas' : ''} <span aria-hidden="true">{showChars ? '▴' : '▾'}</span></span>
+                <span className="sub" style={{ whiteSpace: 'nowrap' }}>{plural(known.length, 'preenchida', 'preenchidas')}{hasNotes ? ' · notas' : ''} <span aria-hidden="true">{showChars ? '▴' : '▾'}</span></span>
               </button>
               {showChars && <>
                 <div className="chips" style={{ marginTop: 10 }}>
