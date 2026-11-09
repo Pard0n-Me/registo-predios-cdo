@@ -83,3 +83,9 @@ export function goRoot() {
   try { p = sessionStorage.getItem('ultima-raiz') || '/' } catch { /* ignora */ }
   go(p)
 }
+
+/** "hoje", "há 1 dia", "há N dias". */
+export function agoText(iso: string): string {
+  const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000))
+  return d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`
+}

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
-import { ADVERTISER, agoText, listActiveSaleAds, type AdRow } from '../data/anuncios'
+import { ADVERTISER, listActiveSaleAds, type AdRow } from '../data/anuncios'
+import { addressText } from '../data/resumo'
 import { norm } from '../data/store'
 import type { Listing } from '../types'
-import { fmtPrice, go } from '../ui'
+import { agoText, fmtPrice, go } from '../ui'
 
 type Who = 'todos' | Listing['advertiser_type']
 const WHO: [Who, string][] = [['todos', 'Todos'], ['particular', 'Particular'], ['agencia', 'Agência'], ['promotor', 'Promotor']]
@@ -46,9 +47,9 @@ export default function AnunciosPage() {
         {!rows && !err && <div className="sub">A carregar…</div>}
         {rows && !rows.length && <div className="card"><div className="sub">Sem anúncios de venda ativos.</div></div>}
         {rows && !!rows.length && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <h2 style={{ margin: 0 }}>Anúncios de venda ativos ({shown.length}{shown.length !== rows.length ? ` de ${rows.length}` : ''})</h2>
+          <>
+            <div className="listhead">
+              <h2>Anúncios de venda ativos ({shown.length}{shown.length !== rows.length ? ` de ${rows.length}` : ''})</h2>
               <select className="t" style={{ width: 'auto', padding: '6px 8px', fontSize: 14 }} aria-label="Ordenar anúncios" value={sort} onChange={e => setSort(e.target.value as Sort)}>
                 {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
@@ -57,17 +58,18 @@ export default function AnunciosPage() {
               {WHO.map(([v, l]) => <button key={v} className={'chip filt' + (who === v ? ' on' : '')} aria-pressed={who === v} onClick={() => setWho(v)}>{l}</button>)}
             </div>
             {!shown.length && <div className="sub" style={{ marginTop: 8 }}>Nenhum anúncio com este filtro.</div>}
-            {shown.map(r => (
-              <div key={r.listing.id} className="row click" role="button" tabIndex={0}
-                onClick={() => open(r.buildingId)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(r.buildingId) } }}>
-                <div>
-                  <b>{r.street}, {r.number}</b>
-                  <div className="sub">{[ADVERTISER[r.listing.advertiser_type], r.listing.typology, agoText(r.at)].filter(Boolean).join(' · ')}</div>
+            <div className="rowlist">
+              {shown.map(r => (
+                <div key={r.listing.id} className="brow" role="button" tabIndex={0}
+                  onClick={() => open(r.buildingId)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(r.buildingId) } }}>
+                  <span className="brow-ic bad"><Icon name="tag" size={22} /></span>
+                  <span className="brow-t">{addressText(r)}</span>
+                  <span className="brow-s">{[ADVERTISER[r.listing.advertiser_type], r.listing.typology, agoText(r.at)].filter(Boolean).join(' · ')}</span>
+                  <span className="brow-pr"><span className="num">{r.price != null ? fmtPrice(r.price) : '—'}</span></span>
                 </div>
-                <b className="num">{r.price != null ? fmtPrice(r.price) : '—'}</b>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
     </>

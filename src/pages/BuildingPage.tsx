@@ -7,6 +7,8 @@ import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPositi
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
 import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, goRoot, listingState, resultText, roleLabel, statusLabel } from '../ui'
 import { usePieces } from '../data/pieces'
+import BuildingHero from '../components/BuildingHero'
+import { addressText, plural } from '../data/resumo'
 import type { Piece } from '../types'
 
 function chips(b: Building): [string, string][] {
@@ -49,6 +51,10 @@ export default function BuildingPage({ id }: { id: string }) {
   for (const v of f.visits) for (const r of f.results.filter(r => r.visit_id === v.id)) if (!last.has(r.unit_id)) last.set(r.unit_id, r)
   const unitBy = new Map(f.units.map(u => [u.label, u]))
   const nUnits = b.floors.reduce((a, x) => a + x.doors.length, 0)
+  const subtitle = [
+    b.floors.length ? `${plural(b.floors.length, 'piso', 'pisos')} · ${plural(nUnits, 'fração', 'frações')}` : '',
+    b.corner_note ?? '', b.origin === 'legado' ? 'legado' : '',
+  ].filter(Boolean).join(' · ')
   const gridLabels = new Set(b.floors.flatMap(x => x.doors.map(d => unitLabel(x.label, d))))
   const extraUnits = f.units.filter(u => !gridLabels.has(u.label))
 
@@ -69,6 +75,16 @@ export default function BuildingPage({ id }: { id: string }) {
     if (!r) return person ? person.name : u.typology ?? '—'
     return r.outcomes.includes('falei') && person ? person.name : resultText(r, pieces)
   }
+  // Célula "sem nada": sem resultado, estado, pessoa nem tipologia (fica fina e tracejada).
+  const hasData = (u: Unit | undefined) =>
+    !!u && (effStatus(u) !== 'nada' || last.has(u.id) || f.personUnits.some(pu => pu.unit_id === u.id) || !!u.typology)
+  // Tipologia e preço do anúncio de venda ativo desta fração.
+  const adLine = (u: Unit) => {
+    const l = f.listings.find(x => x.unit_id === u.id && x.active && x.operation === 'venda')
+    if (!l) return ''
+    const p = f.prices.filter(x => x.listing_id === l.id).sort((a, c) => c.at.localeCompare(a.at))[0]
+    return [l.typology, p ? fmtPrice(p.price) : ''].filter(Boolean).join(' · ')
+  }
 
   const events: Ev[] = [
     ...f.visits.map(v => ({ kind: 'visit' as const, at: v.visited_at, v })),
@@ -77,13 +93,19 @@ export default function BuildingPage({ id }: { id: string }) {
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={goRoot}>‹ Voltar</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
+      <header className="top"><button className="linkbtn" onClick={goRoot}>‹ Voltar</button><h1 className="wrap2">{addressText(b)}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
       <main>
+        <BuildingHero f={f} />
         <div className="card">
           <h2>Frações · último resultado</h2>
-          <div className="sub" style={{ marginTop: -4, marginBottom: 8 }}>{b.floors.length} pisos · {nUnits} frações{b.corner_note ? ` · ${b.corner_note}` : ''}{b.origin === 'legado' ? ' · legado' : ''}</div>
+          {subtitle && <div className="sub" style={{ marginTop: -4, marginBottom: 8 }}>{subtitle}</div>}
           {b.no_ads === 'sim' && <div className="chips" style={{ marginBottom: 8 }}><span className="chip warn">Publicidade não</span></div>}
-          {!b.floors.length && <div className="sub">Grelha por definir. <a href={`#/p/${id}/editar`}>Definir pisos e frações</a></div>}
+          {!b.floors.length && (
+            <div className="emptybox">
+              <div>Este prédio ainda não tem pisos e frações.</div>
+              <button className="btn tonal" onClick={() => go(`/p/${id}/editar`)}>Definir pisos e frações</button>
+            </div>
+          )}
           <div className="grid">
             {b.floors.map(fl => (
               <div className="floor" key={fl.label}>
@@ -91,8 +113,15 @@ export default function BuildingPage({ id }: { id: string }) {
                 <div className="units" style={{ gridTemplateColumns: `repeat(${fl.doors.length},1fr)` }}>
                   {fl.doors.map(d => {
                     const u = unitBy.get(unitLabel(fl.label, d))
-                    return <button key={d} className={'unit ' + cellClass(u && effStatus(u), u && last.get(u.id))} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
-                      <b>{d || fl.label}</b><span>{cellText(u)}</span></button>
+                    const empty = !hasData(u)
+                    const st = u && effStatus(u)
+                    const isAd = st === 'fsbo' || st === 'fsba'
+                    const ad = u && isAd ? adLine(u) : ''
+                    return <button key={d} className={'unit ' + cellClass(st, u && last.get(u.id)) + (empty ? ' empty' : '')} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
+                      <b>{isAd && <Icon name="tag" size={14} />}{isAd ? ' ' : ''}{d || fl.label}</b>
+                      {!empty && <span>{cellText(u)}</span>}
+                      {ad && <span className="unit-ad">{ad}</span>}
+                    </button>
                   })}
                 </div>
               </div>
@@ -129,7 +158,7 @@ export default function BuildingPage({ id }: { id: string }) {
             return <>
               <button className="fold" aria-expanded={showChars} onClick={() => setShowChars(x => !x)}>
                 <h2 style={{ margin: 0 }}>Características</h2>
-                <span className="sub" style={{ whiteSpace: 'nowrap' }}>{known.length} de {all.length}{hasNotes ? ' · notas' : ''} <span aria-hidden="true">{showChars ? '▴' : '▾'}</span></span>
+                <span className="sub" style={{ whiteSpace: 'nowrap' }}>{plural(known.length, 'preenchida', 'preenchidas')}{hasNotes ? ' · notas' : ''} <span aria-hidden="true">{showChars ? '▴' : '▾'}</span></span>
               </button>
               {showChars && <>
                 <div className="chips" style={{ marginTop: 10 }}>
@@ -167,7 +196,7 @@ export default function BuildingPage({ id }: { id: string }) {
 
       </main>
       <div className="fab">
-        <button className="btn sec" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
+        <button className="btn tonal" onClick={() => go(`/p/${id}/anuncio`)}>+ Anúncio</button>
         <button className="btn" onClick={() => go(`/p/${id}/visita`)}>+ Nova visita</button>
       </div>
       {open && <Detail ev={open} f={f} pieces={pieces} onClose={() => setOpen(null)}

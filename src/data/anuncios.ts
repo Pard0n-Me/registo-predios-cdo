@@ -1,4 +1,4 @@
-// Leitura (sem escrita) dos anúncios de venda ativos, para o separador Anúncios e para o cartão do prédio.
+// Leitura (sem escrita) dos anúncios de venda ativos, para o separador Anúncios.
 import { db } from './adapter'
 import type { Building, Listing, ListingPrice } from '../types'
 
@@ -21,15 +21,4 @@ export async function listActiveSaleAds(): Promise<AdRow[]> {
   }).sort((x, y) => y.at.localeCompare(x.at))
 }
 
-/** Último preço entre os anúncios de venda ativos de um prédio (só se lê para o prédio tocado). */
-export async function latestSalePrice(buildingId: string): Promise<number | null> {
-  const ls = (await db.where<Listing>('listings', 'building_id', buildingId)).filter(l => l.active && l.operation === 'venda')
-  return lastPrice(await db.whereIn<ListingPrice>('listing_prices', 'listing_id', ls.map(l => l.id)))
-}
-
 export const ADVERTISER: Record<Listing['advertiser_type'], string> = { particular: 'Particular', agencia: 'Agência', promotor: 'Promotor', '?': 'Por saber' }
-
-export function agoText(iso: string): string {
-  const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000))
-  return d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`
-}

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import BuildingCard from '../components/BuildingCard'
+import BuildingRow from '../components/BuildingRow'
 import Icon from '../components/Icon'
 import MapView, { type MapViewState, type Pin } from '../components/MapView'
 import { listBuildings, norm } from '../data/store'
 import {
-  PIN_COLORS, PIN_TEXT, SHOWS, loadShow, passesFilter, pinState, saveShow, splitAddress, summaryLine, visitedToday,
+  PIN_COLORS, PIN_TEXT, SHOWS, loadShow, passesFilter, pinState, saveShow, splitAddress, addressText, visitedToday,
   type PinState, type Show,
 } from '../data/resumo'
 import type { BuildingSummary } from '../types'
@@ -52,7 +53,7 @@ export default function MapaPage() {
   const shown = useMemo(() => (items ?? []).filter(s => passesFilter(s, show)), [items, show])
   const pins: Pin[] = useMemo(() => shown.filter(s => s.building.lat != null && s.building.lng != null).map(s => {
     const st = pinState(s)
-    const title = `${s.building.street}, ${s.building.number}`
+    const title = addressText(s.building)
     const today = visitedToday(s)
     return {
       id: s.building.id, lat: s.building.lat!, lng: s.building.lng!, color: PIN_COLORS[st], label: s.building.number, title,
@@ -83,15 +84,10 @@ export default function MapaPage() {
           {SHOWS.map(([v, l]) => <button key={v} className={'chip filt mapchip' + (show === v ? ' on' : '')} aria-pressed={show === v} onClick={() => chooseShow(v)}>{l}</button>)}
         </div>
         {q && (
-          <div className="card results">
-            {results.slice(0, 8).map(s => (
-              <div key={s.building.id} className="row click" role="button" tabIndex={0} onClick={() => go(`/p/${s.building.id}`)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(`/p/${s.building.id}`) } }}>
-                <div><b>{s.building.street}, {s.building.number}</b><div className="sub">{summaryLine(s)}</div></div>›
-              </div>
-            ))}
-            {!results.length && <div className="sub">Sem registo para “{q}”.</div>}
-            <div style={{ marginTop: 10 }}><button className="btn sec small" onClick={create}>+ Criar prédio “{splitAddress(q).street}{splitAddress(q).number ? ', ' + splitAddress(q).number : ''}”</button></div>
+          <div className="results">
+            {results.slice(0, 8).map(s => <BuildingRow key={s.building.id} s={s} onOpen={() => go(`/p/${s.building.id}`)} />)}
+            {!results.length && <div className="card"><div className="sub">Sem registo para “{q}”.</div></div>}
+            <div className="card"><button className="btn sec small" onClick={create}>+ Criar prédio “{splitAddress(q).street}{splitAddress(q).number ? ', ' + splitAddress(q).number : ''}”</button></div>
           </div>
         )}
         {err && <div className="err mapnote">{err} <button className="linkbtn" onClick={() => location.reload()}>Tentar outra vez</button></div>}
@@ -99,15 +95,15 @@ export default function MapaPage() {
         {noPos > 0 && !q && <div className="mapnote">{noPos} {noPos === 1 ? 'prédio sem posição no mapa' : 'prédios sem posição no mapa'} · <button className="linkbtn" onClick={() => go('/predios')}>ver na lista</button></div>}
       </div>
 
-      <div className="mapctl">
+      {!q && <div className="mapctl">
         <button className="locate" aria-label="Onde estou" title="Onde estou" onClick={() => setLocate(x => x + 1)}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
         </button>
         <button className="locate" aria-label="Legenda" aria-expanded={legend} title="Legenda" onClick={() => setLegend(x => !x)}><Icon name="info" size={22} /></button>
         <button className="locate" aria-label="Recarregar" title="Recarregar" onClick={() => location.reload()}><Icon name="refresh" size={22} /></button>
-      </div>
+      </div>}
 
-      {legend && (
+      {legend && !q && (
         <div className="legendpanel" role="group" aria-label="Legenda do mapa">
           {STATES.map(st => <div key={st}><Mark st={st} /><span>{PIN_TEXT[st]}</span></div>)}
           <div><span className="legendcheck" aria-hidden="true"><Icon name="check" size={10} /></span><span>Visitado hoje</span></div>
@@ -121,7 +117,7 @@ export default function MapaPage() {
         </div>
       )}
 
-      {current && <BuildingCard s={current} onClose={() => select(null)} />}
+      {current && !q && <BuildingCard s={current} onClose={() => select(null)} />}
     </div>
   )
 }
