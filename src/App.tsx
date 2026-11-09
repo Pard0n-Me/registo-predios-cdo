@@ -2,7 +2,12 @@ import Toast from './components/Toast'
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { db, resetDemo, supabase } from './data/adapter'
-import Home from './pages/Home'
+import MapaPage from './pages/MapaPage'
+import PrediosPage from './pages/PrediosPage'
+import AnunciosPage from './pages/AnunciosPage'
+import MaisPage from './pages/MaisPage'
+import TabBar from './components/TabBar'
+import { ROOTS } from './ui'
 import BuildingPage from './pages/BuildingPage'
 import BuildingForm from './pages/BuildingForm'
 import VisitPage from './pages/VisitPage'
@@ -28,6 +33,9 @@ function route(hash: string) {
   const p = path.split('/').filter(Boolean).map(decodeURIComponent)
   if (p[0] === 'novo') return <BuildingForm initial={{ street: q.get('street') ?? '', number: q.get('number') ?? '' }} />
   if (p[0] === 'pecas') return <PiecesPage />
+  if (p[0] === 'predios') return <PrediosPage />
+  if (p[0] === 'anuncios') return <AnunciosPage />
+  if (p[0] === 'mais') return <MaisPage />
   if (p[0] === 'pessoa' && p[1]) return <PersonPage key={p[1]} id={p[1]} />
   if (p[0] === 'p' && p[1]) {
     const id = p[1]
@@ -37,11 +45,17 @@ function route(hash: string) {
     if (p[2] === 'anuncio') return <ListingForm key={'l' + (p[3] ?? 'novo')} buildingId={id} listingId={p[3]} unitId={q.get('unit') ?? undefined} />
     return <BuildingPage key={id} id={id} />
   }
-  return <Home />
+  return <MapaPage />
 }
+
+/** "/predios?x" → "/predios"; "" → "/". */
+const rootPath = (hash: string) => '/' + hash.split('?')[0].split('/').filter(Boolean).join('/')
 
 export default function App() {
   const hash = useHash()
+  const path = rootPath(hash)
+  const isRoot = ROOTS.includes(path)
+  useEffect(() => { if (isRoot) { try { sessionStorage.setItem('ultima-raiz', path) } catch { /* ignora */ } } }, [isRoot, path])
   const [session, setSession] = useState<Session | null | undefined>(supabase ? undefined : null)
   useEffect(() => {
     if (!supabase) return
@@ -64,7 +78,7 @@ export default function App() {
     <div className="phone">
       {db.demo && <div className="banner">Modo demonstração · dados fictícios só neste aparelho · <button className="linkbtn" style={{ color: '#fff', fontSize: 12, textDecoration: 'underline' }} onClick={resetDemo}>repor</button></div>}
       <Toast />
-      {supabase && session === undefined ? null : supabase && !session ? <Login /> : route(hash)}
+      {supabase && session === undefined ? null : supabase && !session ? <Login /> : (<>{route(hash)}{isRoot && <TabBar path={path} />}</>)}
     </div>
   )
 }

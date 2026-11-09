@@ -73,3 +73,13 @@ export function toLocalInput(d = new Date()): string {
 }
 
 export function go(path: string) { location.hash = path }
+
+/** Páginas raiz (as da barra de separadores). */
+export const ROOTS = ['/', '/predios', '/anuncios', '/mais']
+
+/** Volta à última raiz visitada nesta sessão (Mapa, Prédios, Anúncios ou Mais). */
+export function goRoot() {
+  let p = '/'
+  try { p = sessionStorage.getItem('ultima-raiz') || '/' } catch { /* ignora */ }
+  go(p)
+}

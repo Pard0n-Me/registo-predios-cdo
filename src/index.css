@@ -207,3 +207,8 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 .mapfab.sec{background:var(--card);color:var(--ink)}
 .mapfab.pri{background:var(--accent);color:#fff}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mapfab.pri,:root:not([data-theme="light"]) .mapchip.on{color:#0b1a24}}
+/* Barra de separadores flutuante. Se o desfoque correr mal no iPhone, trocar o fundo por var(--card) (versão opaca). */
+.tabbar{position:fixed;left:0;right:0;width:calc(100% - 24px);max-width:536px;margin:0 auto;bottom:calc(env(safe-area-inset-bottom) + 12px);height:68px;border-radius:26px;background:color-mix(in srgb,var(--card) 88%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);box-shadow:0 6px 20px rgba(0,0,0,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px;z-index:900}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.tabbar{background:var(--card)}}
+.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;border-radius:20px;color:var(--muted);text-decoration:none;font-size:11.5px;font-weight:600}
+.tabbar a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}

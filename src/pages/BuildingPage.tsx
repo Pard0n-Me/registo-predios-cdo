@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import MapView from '../components/MapView'
 import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPosition, unitLabel } from '../data/store'
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
-import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, listingState, resultText, roleLabel, statusLabel } from '../ui'
+import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, goRoot, listingState, resultText, roleLabel, statusLabel } from '../ui'
 import { usePieces } from '../data/pieces'
 import type { Piece } from '../types'
 
@@ -77,7 +77,7 @@ export default function BuildingPage({ id }: { id: string }) {
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Mapa</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
+      <header className="top"><button className="linkbtn" onClick={goRoot}>‹ Voltar</button><h1>{b.street.replace(/^Rua /, 'R. ')}, {b.number}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
       <main>
         <div className="card">
           <h2>Frações · último resultado</h2>

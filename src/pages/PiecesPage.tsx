@@ -18,7 +18,7 @@ export default function PiecesPage() {
 
   return (
     <>
-      <header className="top"><button className="linkbtn" onClick={() => go('/')}>‹ Início</button><h1>Peças de marketing</h1>
+      <header className="top"><button className="linkbtn" onClick={() => go('/mais')}>‹ Mais</button><h1>Peças de marketing</h1>
         <button className="linkbtn" onClick={() => setEdit({ name: '', short_name: '', active: true, sort: (list.at(-1)?.sort ?? 0) + 1 })}>+ Peça</button></header>
       <main>
         <div className="card">
