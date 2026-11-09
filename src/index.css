@@ -171,3 +171,5 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 
 /* ---- Fase 1 (navegação e mapa) ---- */
 .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Filtros com 44 px de altura (R15) */
+.chip.filt{min-height:44px}
