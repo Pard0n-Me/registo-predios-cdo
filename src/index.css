@@ -173,3 +173,5 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 /* Filtros com 44 px de altura (R15) */
 .chip.filt{min-height:44px}
+/* Mapa em altura total */
+.map.fill{position:absolute;inset:0;height:auto;margin:0;border-radius:0}
