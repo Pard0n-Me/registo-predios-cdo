@@ -75,6 +75,16 @@ export default function BuildingPage({ id }: { id: string }) {
     if (!r) return person ? person.name : u.typology ?? '—'
     return r.outcomes.includes('falei') && person ? person.name : resultText(r, pieces)
   }
+  // Célula "sem nada": sem resultado, estado, pessoa nem tipologia (fica fina e tracejada).
+  const hasData = (u: Unit | undefined) =>
+    !!u && (effStatus(u) !== 'nada' || last.has(u.id) || f.personUnits.some(pu => pu.unit_id === u.id) || !!u.typology)
+  // Tipologia e preço do anúncio de venda ativo desta fração.
+  const adLine = (u: Unit) => {
+    const l = f.listings.find(x => x.unit_id === u.id && x.active && x.operation === 'venda')
+    if (!l) return ''
+    const p = f.prices.filter(x => x.listing_id === l.id).sort((a, c) => c.at.localeCompare(a.at))[0]
+    return [l.typology, p ? fmtPrice(p.price) : ''].filter(Boolean).join(' · ')
+  }
 
   const events: Ev[] = [
     ...f.visits.map(v => ({ kind: 'visit' as const, at: v.visited_at, v })),
@@ -103,8 +113,15 @@ export default function BuildingPage({ id }: { id: string }) {
                 <div className="units" style={{ gridTemplateColumns: `repeat(${fl.doors.length},1fr)` }}>
                   {fl.doors.map(d => {
                     const u = unitBy.get(unitLabel(fl.label, d))
-                    return <button key={d} className={'unit ' + cellClass(u && effStatus(u), u && last.get(u.id))} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
-                      <b>{d || fl.label}</b><span>{cellText(u)}</span></button>
+                    const empty = !hasData(u)
+                    const st = u && effStatus(u)
+                    const isAd = st === 'fsbo' || st === 'fsba'
+                    const ad = u && isAd ? adLine(u) : ''
+                    return <button key={d} className={'unit ' + cellClass(st, u && last.get(u.id)) + (empty ? ' empty' : '')} onClick={() => u && go(`/p/${id}/f/${u.id}`)}>
+                      <b>{isAd && <Icon name="tag" size={14} />}{isAd ? ' ' : ''}{d || fl.label}</b>
+                      {!empty && <span>{cellText(u)}</span>}
+                      {ad && <span className="unit-ad">{ad}</span>}
+                    </button>
                   })}
                 </div>
               </div>
