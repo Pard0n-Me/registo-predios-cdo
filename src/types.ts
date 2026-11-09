@@ -172,4 +172,9 @@ export interface BuildingSummary {
   /** Último anúncio inserido (sem o legado), para ordenar a lista. */
   lastListing: { at: string; source: string | null } | null
   visitCount: number
+  /** Anúncio de venda ativo mais recente: último preço, data e se é de particular. `adTypology` só se houver um único anúncio. */
+  adPrice: number | null
+  adTypology: string | null
+  adFsbo: boolean
+  adAt: string | null
 }

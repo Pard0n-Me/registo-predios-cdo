@@ -7,21 +7,31 @@ import { condLabel } from '../ui'
 
 export const unitLabel = (floor: string, door: string) => (door ? `${floor} ${door}` : floor)
 
+/** Resumo de um prédio (lista, mapa e ficha). `prices` pode trazer os preços de vários prédios: só contam os dos anúncios ativos deste. */
+export function summarize(b: Building, visits: Visit[], listings: Listing[], prices: ListingPrice[]): BuildingSummary {
+  const vs = visits.filter(v => v.building_id === b.id)
+  const last = vs.map(v => v.visited_at).sort().at(-1) ?? null
+  const ls = listings.filter(l => l.building_id === b.id)
+  const sale = ls.filter(l => l.active && l.operation === 'venda')
+  const lastL = ls.filter(l => l.source !== 'legado' && l.created_at).sort((x, y) => y.created_at!.localeCompare(x.created_at!))[0]
+  const adDate = (l: Listing) => l.created_at ?? l.first_seen
+  const recent = [...sale].sort((x, y) => adDate(y).localeCompare(adDate(x)))[0]
+  const price = recent ? [...prices.filter(p => p.listing_id === recent.id)].sort((x, y) => y.at.localeCompare(x.at))[0]?.price ?? null : null
+  return { building: b, lastVisit: last, visitCount: vs.length, activeListings: sale.length,
+    activeFsbo: sale.filter(l => l.advertiser_type === 'particular').length,
+    activeRentals: ls.filter(l => l.active && l.operation === 'arrendamento').length,
+    lastListing: lastL ? { at: lastL.created_at!, source: lastL.source } : null,
+    adPrice: price, adTypology: sale.length === 1 ? recent.typology : null,
+    adFsbo: !!recent && recent.advertiser_type === 'particular', adAt: recent ? adDate(recent) : null }
+}
+
 export async function listBuildings(): Promise<BuildingSummary[]> {
   const [buildings, visits, listings] = await Promise.all([
     db.all<Building>('buildings'), db.all<Visit>('visits'), db.all<Listing>('listings'),
   ])
-  return buildings.map(b => {
-    const vs = visits.filter(v => v.building_id === b.id)
-    const last = vs.map(v => v.visited_at).sort().at(-1) ?? null
-    const ls = listings.filter(l => l.building_id === b.id)
-    const sale = ls.filter(l => l.active && l.operation === 'venda')
-    const lastL = ls.filter(l => l.source !== 'legado' && l.created_at).sort((x, y) => y.created_at!.localeCompare(x.created_at!))[0]
-    return { building: b, lastVisit: last, visitCount: vs.length, activeListings: sale.length,
-      activeFsbo: sale.filter(l => l.advertiser_type === 'particular').length,
-      activeRentals: ls.filter(l => l.active && l.operation === 'arrendamento').length,
-      lastListing: lastL ? { at: lastL.created_at!, source: lastL.source } : null }
-  })
+  const prices = await db.whereIn<ListingPrice>('listing_prices', 'listing_id',
+    listings.filter(l => l.active && l.operation === 'venda').map(l => l.id))
+  return buildings.map(b => summarize(b, visits, listings, prices))
 }
 
 export async function getBuildingFull(id: string): Promise<BuildingFull> {
