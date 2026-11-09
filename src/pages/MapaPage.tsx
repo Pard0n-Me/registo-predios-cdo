@@ -95,15 +95,15 @@ export default function MapaPage() {
         {noPos > 0 && !q && <div className="mapnote">{noPos} {noPos === 1 ? 'prédio sem posição no mapa' : 'prédios sem posição no mapa'} · <button className="linkbtn" onClick={() => go('/predios')}>ver na lista</button></div>}
       </div>
 
-      <div className="mapctl">
+      {!q && <div className="mapctl">
         <button className="locate" aria-label="Onde estou" title="Onde estou" onClick={() => setLocate(x => x + 1)}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
         </button>
         <button className="locate" aria-label="Legenda" aria-expanded={legend} title="Legenda" onClick={() => setLegend(x => !x)}><Icon name="info" size={22} /></button>
         <button className="locate" aria-label="Recarregar" title="Recarregar" onClick={() => location.reload()}><Icon name="refresh" size={22} /></button>
-      </div>
+      </div>}
 
-      {legend && (
+      {legend && !q && (
         <div className="legendpanel" role="group" aria-label="Legenda do mapa">
           {STATES.map(st => <div key={st}><Mark st={st} /><span>{PIN_TEXT[st]}</span></div>)}
           <div><span className="legendcheck" aria-hidden="true"><Icon name="check" size={10} /></span><span>Visitado hoje</span></div>
@@ -117,7 +117,7 @@ export default function MapaPage() {
         </div>
       )}
 
-      {current && <BuildingCard s={current} onClose={() => select(null)} />}
+      {current && !q && <BuildingCard s={current} onClose={() => select(null)} />}
     </div>
   )
 }
