@@ -98,16 +98,6 @@ export function detailLine(s: BuildingSummary): string {
   return cap(parts.join(' · '))
 }
 
-export function summaryLine(s: BuildingSummary) {
-  const n = s.building.floors.reduce((a, f) => a + f.doors.length, 0)
-  const parts = [n ? `${n} frações` : 'grelha por definir']
-  parts.push(s.lastVisit ? `última visita ${fmtDate(s.lastVisit)}` : 'sem visitas')
-  if (s.activeListings) parts.push(`${s.activeListings} ${s.activeListings === 1 ? 'anúncio de venda' : 'anúncios de venda'}`)
-  if (s.activeRentals) parts.push(`${s.activeRentals} ${s.activeRentals === 1 ? 'arrendamento' : 'arrendamentos'}`)
-  if (s.lastListing) parts.push(`anúncio inserido ${fmtDate(s.lastListing.at)} (${s.lastListing.source === 'radar' ? 'radar' : 'manual'})`)
-  return parts.join(' · ')
-}
-
 /** Separa "correia teles 90" em rua e número. */
 export function splitAddress(q: string): { street: string; number: string } {
   const m = q.trim().match(/^(.*?)[\s,]+(\d+[a-zA-Z]?)\s*$/)
