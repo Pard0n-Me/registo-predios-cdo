@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from '../components/Icon'
 import Reload from '../components/Reload'
-import { ADVERTISER, agoText, listActiveSaleAds, type AdRow } from '../data/anuncios'
+import { ADVERTISER, listActiveSaleAds, type AdRow } from '../data/anuncios'
 import { norm } from '../data/store'
 import type { Listing } from '../types'
-import { fmtPrice, go } from '../ui'
+import { agoText, fmtPrice, go } from '../ui'
 
 type Who = 'todos' | Listing['advertiser_type']
 const WHO: [Who, string][] = [['todos', 'Todos'], ['particular', 'Particular'], ['agencia', 'Agência'], ['promotor', 'Promotor']]
