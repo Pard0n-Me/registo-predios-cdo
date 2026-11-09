@@ -7,6 +7,7 @@ import { deleteListing, deleteVisit, geocode, getBuildingFull, setBuildingPositi
 import type { Building, BuildingFull, Listing, Unit, Visit, VisitResult } from '../types'
 import { cellClass, condLabel, fmtDate, fmtDateTime, fmtPrice, go, goRoot, listingState, resultText, roleLabel, statusLabel } from '../ui'
 import { usePieces } from '../data/pieces'
+import BuildingHero from '../components/BuildingHero'
 import { addressText, plural } from '../data/resumo'
 import type { Piece } from '../types'
 
@@ -84,6 +85,7 @@ export default function BuildingPage({ id }: { id: string }) {
     <>
       <header className="top"><button className="linkbtn" onClick={goRoot}>‹ Voltar</button><h1 className="wrap2">{addressText(b)}</h1><button className="linkbtn" onClick={() => go(`/p/${id}/editar`)}>Editar</button><Reload /></header>
       <main>
+        <BuildingHero f={f} />
         <div className="card">
           <h2>Frações · último resultado</h2>
           {subtitle && <div className="sub" style={{ marginTop: -4, marginBottom: 8 }}>{subtitle}</div>}
