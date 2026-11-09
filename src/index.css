@@ -175,3 +175,16 @@ button,a,.row.click,.ev,.unit{-webkit-tap-highlight-color:transparent;touch-acti
 .chip.filt{min-height:44px}
 /* Mapa em altura total */
 .map.fill{position:absolute;inset:0;height:auto;margin:0;border-radius:0}
+/* Cartão do prédio. Verde e âmbar escurecidos para o texto das etiquetas (contraste ≥ 4,5:1). */
+:root{--ok-t:#22663f;--warn-t:#8a5200}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ok-t:#7fcf9c;--warn-t:#f0b35a}}
+.bcard{position:fixed;left:0;right:0;width:calc(100% - 24px);max-width:536px;margin:0 auto;bottom:calc(env(safe-area-inset-bottom) + 92px);background:var(--card);border-radius:24px;box-shadow:0 10px 32px rgba(0,0,0,.22);padding:14px 16px 16px;z-index:850}
+.bcard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.bcard h3{margin:0;font-size:19px;letter-spacing:-.01em}
+.bcard-h .iconbtn{margin:-8px -10px 0 0}
+.bcard-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 4px}
+.bcard .chip{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.bcard .chip.ok{color:var(--ok-t)}
+.bcard .chip.warn{color:var(--warn-t)}
+.bprice{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bcard-btns{display:grid;grid-template-columns:1fr 1.25fr;gap:10px;margin-top:12px}
